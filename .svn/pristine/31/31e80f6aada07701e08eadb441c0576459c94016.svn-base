@@ -1,0 +1,63 @@
+package cn.edu.hit.model;
+
+public class ReadInfo {
+	
+	int alignmentStart;
+	int alignmentEnd;
+	String cigarString;
+	String readString;
+	int mateAlignmentStart;
+	int flag;
+	String refName;
+	int readLength;
+	
+	public String getRefName() {
+		return refName;
+	}
+	public void setRefName(String refName) {
+		this.refName = refName;
+	}
+	public int getReadLength() {
+		return readLength;
+	}
+	public void setReadLength(int readLength) {
+		this.readLength = readLength;
+	}
+	public int getFlag() {
+		return flag;
+	}
+	public void setFlag(int flag) {
+		this.flag = flag;
+	}
+	public int getMateAlignmentStart() {
+		return mateAlignmentStart;
+	}
+	public void setMateAlignmentStart(int mateAlignmentStart) {
+		this.mateAlignmentStart = mateAlignmentStart;
+	}
+	public int getAlignmentStart() {
+		return alignmentStart;
+	}
+	public void setAlignmentStart(int alignmentStart) {
+		this.alignmentStart = alignmentStart;
+	}
+	public int getAlignmentEnd() {
+		return alignmentEnd;
+	}
+	public void setAlignmentEnd(int alignmentEnd) {
+		this.alignmentEnd = alignmentEnd;
+	}
+	public String getCigarString() {
+		return cigarString;
+	}
+	public void setCigarString(String cigarString) {
+		this.cigarString = cigarString;
+	}
+	public String getReadString() {
+		return readString;
+	}
+	public void setReadString(String readString) {
+		this.readString = readString;
+	}
+	
+}
