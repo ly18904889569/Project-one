@@ -26,7 +26,7 @@ public class MainEncoding {
 		// 异常信息的质量分数，测试可以完整通过
 //		byte[] exQual = encoding.EncodeExceptionQual(vE);		//liyang：对于异常值的处理
 		
-//		byte[] pbwtQual = encoding.EncodePbwtQual(vE);		//liyang:对于质量分数的处理
+		byte[] pbwtQual = encoding.EncodePbwtQual(vE);		//liyang:对于质量分数的处理
 		
 		// encodePBWT测试可以完整通过
 		byte[] pbwt = encoding.EncodePbwt(vE);				//liyang：对于正常信息的处理
