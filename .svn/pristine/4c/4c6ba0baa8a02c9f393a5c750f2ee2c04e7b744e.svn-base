@@ -1,0 +1,23 @@
+package cn.edu.hit.model;
+
+public class RefEncodeData {
+
+	public int distance;
+	public int isReverse;
+	
+	
+	public int getDistance() {
+		return distance;
+	}
+	public void setDistance(int distance) {
+		this.distance = distance;
+	}
+	public int getIsReverse() {
+		return isReverse;
+	}
+	public void setIsReverse(int isReverse) {
+		this.isReverse = isReverse;
+	}
+	
+	
+}

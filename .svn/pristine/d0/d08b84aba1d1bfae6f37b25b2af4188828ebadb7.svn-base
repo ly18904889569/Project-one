@@ -1,0 +1,626 @@
+package cn.edu.hit.core;
+
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
+import cn.edu.hit.model.ReadInfo;
+import cn.edu.hit.model.ReadsPreProc;
+import cn.edu.hit.model.ReadsEncodeData;
+import cn.edu.hit.model.RefEncodeData;
+import htsjdk.samtools.SAMFileReader;
+import htsjdk.samtools.SAMRecord;
+import htsjdk.samtools.SAMRecordIterator;
+import htsjdk.samtools.ValidationStringency;
+
+public class ReadStream {
+	
+	public List<Integer> refEncodes = new ArrayList<Integer>();
+	public List<RefEncodeData> refEncodeDatas = new ArrayList<RefEncodeData>();
+	//一些额外的附属信息编码
+	public String refEncodeExtra;
+	//游程编码，将Ref的0、1值进行编码
+	public static List<Byte> refBytes = new ArrayList<Byte>();
+	//游程编码，对Ref的Data进行编码，isReversed和distance进行编码
+	public static List<Byte> refDataBytes = new ArrayList<Byte>();
+	
+	//Reads的值垂直编码重新排位值
+	public List<Integer> readsEncode = new ArrayList<Integer>();
+	//非equal的情形下的具体值
+	public List<Integer> readsDataEncode = new ArrayList<Integer>();
+	
+	//游程编码，对Reads的0、1值进行编码
+	public static List<Byte> readsBytes = new ArrayList<Byte>();
+	//将不匹配的值保存下来
+	public static List<Byte> readsDataBytes = new ArrayList<Byte>();
+	
+	
+	
+	public static void main(String[] args) throws IOException{
+		File  sortedBamFile = new File("c:/data/bio/2011_Streubel/Sample_4288/Sample_4288-aln-final-sorted-filtered.bam");
+		ReadStream readStream = new ReadStream();
+		readStream.readStream(sortedBamFile);
+	}
+	
+	/**
+	 * 读取Read序列
+	 * @param sortedBamFile
+	 * @throws IOException 
+	 */
+	public void readStream(File sortedBamFile) throws IOException{
+		System.out.println("Sam version..");
+		SAMFileReader inputSam = new SAMFileReader(sortedBamFile);
+		System.out.println(inputSam.getFileHeader().getVersion());
+		
+		inputSam.setValidationStringency(ValidationStringency.LENIENT);
+		
+		SAMRecordIterator samit = inputSam.iterator();
+		SAMRecord rec = null;
+		String currentRefName = null;
+		List<ReadInfo> readInfoList = new ArrayList();
+		PrintWriter writer = new PrintWriter("G:\\filename.txt", "UTF-8");
+		while(samit.hasNext()){
+			rec = (SAMRecord) samit.next();
+			//writer.println(rec.getAlignmentStart());
+			//判断一下是否还是同一个Reference,不是同一个Reference则批量处理一次
+			if(currentRefName != null && !rec.getReferenceName().equals(currentRefName)){
+				//这里实质上是便于对一个SAM文件中包含多个reference的情形，按照reference进行处理
+				System.out.println("referenceName different...");
+				//调用getReadStream对原始数据进行处理
+				List<ReadsPreProc> readsList = getReadStream(readInfoList);
+				//处理完成之后及时清除掉
+				readInfoList.clear();
+				//对ref序列进行编码工作
+//				refProc(readsList);
+				//对Reads序列进行编码
+				System.out.println("readsList size:"+readsList.size());
+				readsProc(readsList);
+			}
+			currentRefName = rec.getReferenceName();
+			ReadInfo readInfo = new ReadInfo();
+			readInfo.setAlignmentStart(rec.getAlignmentStart());
+			readInfo.setMateAlignmentStart(rec.getMateAlignmentStart());
+			readInfo.setAlignmentEnd(rec.getAlignmentEnd());
+			readInfo.setCigarString(rec.getCigarString());
+			readInfo.setReadString(rec.getReadString());
+			readInfo.setFlag(rec.getFlags());
+			readInfo.setRefName(rec.getReferenceName());
+			readInfo.setReadLength(rec.getReadLength());
+			readInfoList.add(readInfo);
+		}
+		//最后一次的结果单独处理一下
+		if(readInfoList.size()>0){
+			System.out.println("referenceName different...");
+			//调用getReadStream对原始数据进行处理
+			List<ReadsPreProc> readsList = getReadStream(readInfoList);
+			//处理完成之后及时清除掉
+			readInfoList.clear();
+			//Reads序列和Ref比对后，进行Ref和RefData编码工作
+			refProc(readsList);
+		}
+		
+		
+	}
+	
+	
+	//reads序列参照ref进行编码
+	void readsProc(List<ReadsPreProc> readsList){
+		System.out.println("Enter readsProc...");
+		
+		//设置当前处理的位点，方便比对时元素的出入
+		int currPos = 0;
+		//统计用的变量
+		int countNum = 0;
+		//获得第一个比对序列的起始位点
+		currPos = readsList.get(0).getAlignmentStart();
+		//定义每一条reads的长度
+		int readsLength = readsList.get(0).getAlignmentEnd() - readsList.get(0).getAlignmentStart() + 1;
+		//currReadsList用来存储当前正在处理的reads序列
+		List<ReadsPreProc> currReadsList = new ArrayList<ReadsPreProc>();
+		//对readsList序列进行迭代处理
+		System.out.println("readsList.size : "+readsList.size());
+		for( int i=0 ; i< readsList.size(); ){
+//			System.out.println("pos diff:"+(readsList.get(i).getAlignmentStart() - currPos));
+			if(currPos % 100000 == 0){
+				System.out.println("currPos: "+currPos);
+			}
+			//如果当前比对List中元素为空，则直接更新pos的位置
+			if(currReadsList.size() == 0){
+				currPos = readsList.get(i).getAlignmentStart();
+			}
+			
+			//如果和当前比较位点差一个位置，则将该Reads加入到当前比对序列中
+			try{
+				while(readsList.get(i).getAlignmentStart() - currPos == 0){
+					System.out.println("currListSize :"+currReadsList.size());
+					currReadsList.add(readsList.get(i));
+					//此处控制一下位点移动
+					if(i < (readsList.size() -1)){
+						i++;
+					}
+				}
+			}catch(Exception e){
+				System.out.println("Exception eccours:"+i);
+				System.out.println("currPos:"+ currPos);
+				System.out.println("alignmentStart:" + readsList.get(i-1).getAlignmentStart());
+				System.out.println("currReadsList size :"+ currReadsList.size());
+			}
+			
+			//对元素的移除进行处理
+			for(Iterator<ReadsPreProc> iterator = currReadsList.iterator(); iterator.hasNext(); ){
+			    if(iterator.next().getAlignmentEnd() < currPos){
+			    	iterator.remove();
+			    }
+			    System.out.println();
+			    
+			}
+			
+			/**
+			 * 如果在这里不边统计采用游程编码的话，很容易溢出的，因为基因序列本身会非常的长
+			 */
+			
+			//Reads元素编码处理
+			for(ReadsPreProc currReads: currReadsList){
+				
+				int alignStart = currReads.getAlignmentStart();
+				if( (currPos - alignStart >=0) && (currPos - alignStart <= readsLength) ){
+					//获得元素的值
+					SYMBOL value = currReads.getValues().get(currPos- alignStart);
+					//对元素的值，按照其类型进行编码
+					if(SYMBOL.E.equals(value)){
+//						readsEncode.add(0);
+						countNum ++;
+					}else{
+						//先对Equal的值进行游程编码
+						convert2Byte("reads",0,countNum);
+						countNum = 0;
+//						readsEncode.add(1);
+						readsDataEncode.add(value.ordinal());
+					}
+				}
+			}//End for(ReadsPrePro...)
+			
+			//比较位点后移
+			currPos++;
+			
+		}//End for(int i =0)
+		//输出一下编码的结果看看
+		int idx=0;
+		for(Integer iValue: readsEncode){
+			if(iValue == 1){
+				System.out.print(iValue+":"+readsDataEncode.get(idx++)+"; ");
+			}else{
+				System.out.println(iValue+"; ");
+			}
+			
+		}
+	}
+	
+	
+	
+	
+	//Reads序列和Ref比对后，进行Ref和RefData编码工作
+	void refProc(List<ReadsPreProc> readsList) throws IOException{
+		//进行Ref编码
+		int currentPos = 1;
+		int index = 0;
+		//设置一下偏移量，主要是Insertion的情形下需要,这个是reads部分要用到
+		int offSet = 0;
+		System.out.println(readsList.size());
+		for(ReadsPreProc reads:readsList){
+			index = reads.getAlignmentStart();
+			for(int i=0;i<index-currentPos; i++){
+				refEncodes.add(0);
+			}
+			refEncodes.add(1);
+			RefEncodeData refData = new RefEncodeData();
+			refData.setDistance(reads.getMateAlignmentDistance());
+			refData.setIsReverse(reads.getIsReversed());
+			refEncodeDatas.add(refData);
+			currentPos = index;
+		}
+		
+		System.out.println("ref length:"+refEncodes.size());
+		System.out.println("refData length:"+refEncodeDatas.size());
+		
+//		//输出一下距离看看
+//		for(RefEncodeData refD :refEncodeDatas ){
+//			System.out.println("distances:"+refD.distance);
+//		}
+//		
+		
+		//游程编码部分编一下
+		//这里统计一下0、1的个数，然后进行游程编码
+		int countZero=0, countOne = 0;
+		int currentNum = 0;
+		for(int refEncodes :refEncodes){
+			if(refEncodes != currentNum){
+				//这里就要调用编码工作了
+				if(currentNum == 0){
+					convert2Byte("ref",0,countZero);
+				}else{
+					convert2Byte("ref",1,countOne);
+				}
+				
+				//计数清零
+				countZero = 0;
+				countOne = 0;
+			}
+			currentNum = refEncodes;
+			if(refEncodes == 0){
+				countZero++;
+			}else{
+				countOne++;
+			}
+		}
+		
+		//对RefData进行编码也是
+		for(RefEncodeData refData: refEncodeDatas){
+			convert2Byte2(refData.isReverse, refData.getDistance());
+		}
+		
+		//可以输出一下编码的结果看一下
+//		System.out.println("Print bytes result:");
+//		for(byte by:refBytes){
+//			System.out.println(by);
+//		}
+
+System.out.println("write file...");
+		//输出RefBytes
+		byte[] bytes = new byte[refBytes.size()];
+		for(int i = 0; i < refBytes.size(); i ++){
+			bytes[i] = refBytes.get(i);
+		}
+		BufferedOutputStream bufferedOut = new BufferedOutputStream(new FileOutputStream("G:/file/refBytes"));
+		bufferedOut.write(bytes);
+		bufferedOut.flush();
+		bufferedOut.close();
+		
+		//输出RefDataBytes
+		byte[] bytes2 = new byte[refDataBytes.size()];
+		for(int i=0; i< refDataBytes.size(); i++){
+			bytes2[i] = refDataBytes.get(i);
+		}
+		BufferedOutputStream bufferedOut2 = new BufferedOutputStream(new FileOutputStream("G:/file/refDataBytes"));
+		bufferedOut2.write(bytes2);
+		bufferedOut2.flush();
+		bufferedOut2.close();
+		
+		
+System.out.println("write ok...");
+	}
+	
+	/**
+	 * 对RefData的isReversed和distance进行编码
+	 * 距离是基于base的差值编码，插值的话，2^7也只能到128
+	 * @param isReversed
+	 * @param base
+	 * @param distance
+	 */
+	static void convert2ByteDiff(int isReversed, int base,int distance){
+		
+	}
+	
+	/**
+	 * 对RefData的isReversed和distance进行编码
+	 * 也是用游程编码，第一位标志isReversed，第二位标志是否已经结束
+	 * 编码整体采用低位到高位的编码
+	 * 目前这么处理，只能处理到distance<4096的情形
+	 * @param value
+	 * @param number
+	 */
+	static void convert2Byte2(int isReversed,int distance){
+		int  num00 = 0, num10 = -128, num01 = 64, num11 = -64, num0=0;
+		byte by = 0, by1 = 0;
+		int num1 = 0,num2 =0;
+		if(isReversed == 1){
+			if(distance <32){
+				by = (byte)(distance | num10);
+			}else{
+				//distance不为0的情形，要两步处理
+				num1 = distance/32;
+				num2 = distance % 32;
+				//高位
+				by1 = (byte)(num1 | num0);
+				//低位
+				by = (byte)(num2 | num11);
+			}
+		}else{
+			if(distance <32 ){
+				by = (byte)(distance | num00);
+			}else{
+				num1 = distance/32;
+				num2 = distance % 32;
+				by1 = (byte)(num1 | num0);
+				by = (byte)(num2 | num01);
+			}
+		}
+		refDataBytes.add(by);
+		if(by1 !=0){
+			refDataBytes.add(by1);
+		}
+		
+	}
+	
+	/**
+	 * 游程编码
+	 * @param value
+	 * @param number
+	 */
+	static void convert2Byte(String switchFlag,int value,int number) {
+        /**
+         * 先和-64(11000000)做或运算
+         * 值范围0~63时
+         * 0开头63（00111111）
+         * 1开头-65（10111111）
+         * 值范围64~2048
+         * 0开头95（01011111）
+         * 1开头-33（11011111）
+         * 值范围2048~
+         * 0开头127（01111111）
+         * 1开头-1（11111111）
+         * 进行与运算
+         */
+		int orNum = -64, num00=63, num10=-65, num010 = 95, num110 = -33,num011=127,num111 = -1;
+		int num3=0, num2=0, num1=0;
+		if(value == 0){
+			//0的游程编码
+			//011的情形
+			num3 = number/2048;
+			if(num3 != 0){
+				byte by3 = (byte) ((num3|orNum)&127);
+				if(switchFlag.equals("ref")){
+					refBytes.add(by3);
+				}else{
+					readsBytes.add(by3);
+				}
+			}
+			
+			//010的情形
+			num2 = (number%2048)/64;
+			if(num2 != 0){
+				byte by2 =(byte)((num2|orNum)&95);
+				if(switchFlag.equals("ref")){
+					refBytes.add(by2);
+				}else{
+					readsBytes.add(by2);
+				}
+			}
+			
+			//00的情形
+			num1 = (number%64);
+			if(num1 != 0){
+				byte by1 = (byte)((num1|orNum)&63);
+				if(switchFlag.equals("ref")){
+					refBytes.add(by1);
+				}else{
+					readsBytes.add(by1);
+				}
+			}
+			
+		}else{
+			//1的游程编码
+			//111的情形
+			num3 = number/2048;
+			if(num3 !=0){
+				byte by3 = (byte) ((num3|orNum)&(-1));
+				if(switchFlag.equals("ref")){
+					refBytes.add(by3);
+				}else{
+					readsBytes.add(by3);
+				}
+			}
+			
+			//110的情形
+			num2 = (number%2048)/64;
+			if(num2 !=0){
+				byte by2 =(byte)((num2|orNum)&(-33));
+				if(switchFlag.equals("ref")){
+					refBytes.add(by2);
+				}else{
+					readsBytes.add(by2);
+				}
+			}
+			
+			//10的情形
+			num1 = (number%64);
+			if(num1 != 0){
+				byte by1 = (byte)((num1|orNum)&(-65));
+				if(switchFlag.equals("ref")){
+					refBytes.add(by1);
+				}else{
+					readsBytes.add(by1);
+				}
+			}
+			
+		}
+    }
+	
+	/**
+	 * 对于记录distance和isReverse用类似上面游程编码的方式
+	 * isReverse作为第一位，然后distance进行编码工作
+	 */
+	
+	
+	
+	/**
+	 * 获得处理完成后的Reads序列
+	 * @param sortedBamFile
+	 * @return
+	 * @throws UnsupportedEncodingException 
+	 * @throws FileNotFoundException 
+	 */
+	List<ReadsPreProc> getReadStream(List<ReadInfo> readInfoList) throws FileNotFoundException, UnsupportedEncodingException{
+		System.out.println("getReadStream....");
+		List<ReadsPreProc> readsList = new ArrayList<ReadsPreProc>();
+		for(ReadInfo rd : readInfoList){
+			ReadsPreProc readsPreProc = new ReadsPreProc();
+			readsPreProc.setAlignmentStart(rd.getAlignmentStart());
+			readsPreProc.setAlignmentEnd(rd.getAlignmentEnd());
+			//与匹配Read的距离,这里计算时用的是上一条链的结束和下一条链的开始
+			int distance = rd.getMateAlignmentStart()- rd.getAlignmentEnd();
+			if(distance >0 ){
+				readsPreProc.setMateAlignmentDistance(distance);
+			}
+			//判断是否为反转链
+			if( ((rd.getFlag())&16) == 16){
+				readsPreProc.setIsReversed(1);
+			}else{
+				readsPreProc.setIsReversed(0);
+			}
+				
+			readsPreProc.setValues(readMatch(rd.getAlignmentStart(),rd.getCigarString(),rd.getReadString()));
+			readsList.add(readsPreProc);
+		}
+		System.out.println("getReadStream return..");
+		return readsList;
+	}
+	
+	/**
+	 * 返回匹配后的位点信息
+	 * @param cigar
+	 * @param readString
+	 * @return
+	 */
+	List<SYMBOL> readMatch(int alignmentStart,String cigar, String readString){
+		List<SYMBOL> readList = new ArrayList<SYMBOL>();
+		String[] cigars =cigar.split("(?<=\\D)(?=\\d)|(?<=\\d)(?=\\D)");
+		int num;
+		String alphabet;
+		int index = 0;
+		int indexTemp = 0;
+		int end = 0;
+		for(int i = 0; i< cigars.length; i++){
+			if(i%2 == 0)
+				continue;
+			num = Integer.parseInt(cigars[i-1]);
+			alphabet = cigars[i];
+			//判断一下字母的类型
+			switch(alphabet){
+				case "m":
+				case "M":
+					end = index+num;
+					for(;index<end;index++){
+						readList.add(SYMBOL.E);
+					}
+					break;
+				case "i":
+				case "I":
+					for(int ii=0 ; ii< num; ii++){
+						String value = readString.substring(index+ii,index+ii+1);
+						if("A".equalsIgnoreCase(value)){
+							readList.add(SYMBOL.Q);
+						}else if("C".equalsIgnoreCase(value)){
+							readList.add(SYMBOL.V);
+						}else if("G".equalsIgnoreCase(value)){
+							readList.add(SYMBOL.H);
+						}else if("T".equalsIgnoreCase(value)){
+							readList.add(SYMBOL.Y);
+						}
+					}
+					index +=num;
+					break;
+				case "d":
+				case "D":
+					indexTemp = index;
+					end = index+num;
+					for(;indexTemp < end;indexTemp++){
+						readList.add(SYMBOL.D);
+					}
+					break;
+				case "n":
+				case "N":
+					end = index+num;
+					for(;index < end;index++){
+						readList.add(SYMBOL.N);
+					}
+					System.out.println("skip..."+num);
+					break;
+				case "s":
+				case "S":
+					for(int is=num; is>0; is--){
+						String value = readString.substring(index-is,index-is+1);
+						if("A".equalsIgnoreCase(value)){
+							readList.add(SYMBOL.A);
+						}else if("C".equalsIgnoreCase(value)){
+							readList.add(SYMBOL.C);
+						}else if("G".equalsIgnoreCase(value)){
+							readList.add(SYMBOL.G);
+						}else if("T".equalsIgnoreCase(value)){
+							readList.add(SYMBOL.T);
+						}
+					}
+					break;
+				case "h":
+				case "H":
+					System.out.println("hand cliping..."+num);
+					break;
+				case "p":
+				case "P":
+					indexTemp = index;
+					end = index + num;
+					for(;indexTemp < end; indexTemp++){
+						readList.add(SYMBOL.P);
+					}
+					break;
+				case "=":
+					end = index + num;
+					for(;index < end; index++){
+						readList.add(SYMBOL.E);
+					}
+					break;
+				case "x":
+				case "X":
+					end = index + num;
+					for(;index < end;index++){
+						String value = readString.substring(index,index+1);
+						if("A".equalsIgnoreCase(value)){
+							readList.add(SYMBOL.A);
+						}else if("C".equalsIgnoreCase(value)){
+							readList.add(SYMBOL.C);
+						}else if("G".equalsIgnoreCase(value)){
+							readList.add(SYMBOL.G);
+						}else if("T".equalsIgnoreCase(value)){
+							readList.add(SYMBOL.T);
+						}
+					}
+					break;
+				default:
+					System.out.println("Exception occurs alphabet match.");
+			}
+		}
+		/*
+		System.out.println(cigar);
+		System.out.println("result:");
+		System.out.println(readString);
+		for(SYMBOL sy:readList){
+			System.out.print(sy.name());
+		}
+		System.out.println();
+		System.out.println("list length"+readList.size());
+		*/
+		
+		return readList;
+	}
+	
+	
+	
+	public static enum SYMBOL{
+		//A,C,G,T
+		A,C,G,T,
+		//AI,CI,GI,TI
+		Q,V,H,Y,
+		//D,N,S,P
+		D,N,S,P,
+		//equals
+		E
+	}
+	
+}

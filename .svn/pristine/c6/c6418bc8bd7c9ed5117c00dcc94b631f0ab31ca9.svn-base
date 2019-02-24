@@ -1,0 +1,51 @@
+package cn.edu.hit.model;
+
+import java.util.List;
+import java.util.Map;
+
+import cn.edu.hit.core.ReadStream.SYMBOL;
+
+/**
+ * 预处理的数据，主要要求能够将变异点等位点信息记录下来
+ * @author Rivers
+ *
+ */
+public class ReadsPreProc {
+	int alignmentStart;
+	int alignmentEnd;
+	int mateAlignmentDistance;
+	int isReversed;
+	List<SYMBOL> values;
+	
+	
+	public int getIsReversed() {
+		return isReversed;
+	}
+	public void setIsReversed(int isReversed) {
+		this.isReversed = isReversed;
+	}
+	public int getAlignmentStart() {
+		return alignmentStart;
+	}
+	public void setAlignmentStart(int alignmentStart) {
+		this.alignmentStart = alignmentStart;
+	}
+	public int getAlignmentEnd() {
+		return alignmentEnd;
+	}
+	public void setAlignmentEnd(int alignmentEnd) {
+		this.alignmentEnd = alignmentEnd;
+	}
+	public int getMateAlignmentDistance() {
+		return mateAlignmentDistance;
+	}
+	public void setMateAlignmentDistance(int mateAlignmentDistance) {
+		this.mateAlignmentDistance = mateAlignmentDistance;
+	}
+	public List<SYMBOL> getValues() {
+		return values;
+	}
+	public void setValues(List<SYMBOL> values) {
+		this.values = values;
+	}
+}

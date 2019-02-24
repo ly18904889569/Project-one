@@ -1,0 +1,6 @@
+package cn.edu.hit.model;
+
+
+public class ReadsEncodeData {
+	public int symbol;
+}
