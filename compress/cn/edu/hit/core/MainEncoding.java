@@ -21,34 +21,35 @@ public class MainEncoding {
 		MainEncoding encoding = new MainEncoding();
 		VerticalEncoding vE = new VerticalEncoding();
 		// 异常信息列表，测试可以完整通过
-//		byte[] exBy = encoding.EncodeExceptionList(vE);		//liyang:对于异常信息的处理是采用哈弗曼编码
+		byte[] exBy = encoding.EncodeExceptionList(vE);		//liyang:对于异常信息的处理是采用哈弗曼编码
 		
 		// 异常信息的质量分数，测试可以完整通过
-//		byte[] exQual = encoding.EncodeExceptionQual(vE);		//liyang：对于异常值的处理
+		byte[] exQual = encoding.EncodeExceptionQual(vE);		//liyang：对于异常值的处理
 		
-//		byte[] pbwtQual = encoding.EncodePbwtQual(vE);		//liyang:对于质量分数的处理
+		byte[] pbwtQual = encoding.EncodePbwtQual(vE);		//liyang:对于质量分数的处理
 		
 		// encodePBWT测试可以完整通过
 		byte[] pbwt = encoding.EncodePbwt(vE);				//liyang：对于正常信息的处理
 		
 		System.out.println("The encoding is end");
 		//进行一下写文件的操作
-//		String fileDestEx = "/home/liyang/Document/compress/output/10X/10X-exceptional/exBy";
-//		String fileDestExQual ="/home/liyang/Document/compress/output/10X/10X-all/exQual";
-//		String fileDestPbwtQual = "/home/liyang/Document/compress/output/10X/10X-all/pbwtQual";
-//		String fileDestPbwt = "/home/liyang/Document/compress/output/10X/10X-all/pbwt";
-//		String fileDestEx = "/home/yangli/Documents/compress/exBy";
-//		String fileDestExQual ="/home/yangli/Documents/compress/exQual";
-//		String fileDestPbwtQual = "/home/yangli/Documents/compress/pbwtQual";
-		String fileDestPbwt = "/home/yangli/Documents/compress/pbwt";
+		String fileDestEx = "/home/liyang/Document/compress/output/50X/50X-all/exBy";
+		String fileDestExQual ="/home/liyang/Document/compress/output/50X/50X-all/exQual";
+		String fileDestPbwtQual = "/home/liyang/Document/compress/output/50X/50X-all/pbwtQual";
+		String fileDestPbwt = "/home/liyang/Document/compress/output/50X/50X-all/pbwt";
+//		String fileDestEx = "/home/yangli/Documents/compress/exBy1";
+//		String fileDestExQual ="/home/yangli/Documents/compress/exQual1";
+//		String fileDestPbwtQual = "/home/yangli/Documents/compress/pbwtQual1";
+//		String fileDestPbwt = "/home/yangli/Documents/compress/pbwt1";
 		try {
-//            Path path = Paths.get(fileDestEx);
-//            Files.write(path, exBy);
-//            path = Paths.get(fileDestExQual);
-//            Files.write(path, exQual);
-//            path = Paths.get(fileDestPbwtQual);
-//            Files.write(path, pbwtQual);
-            Path path = Paths.get(fileDestPbwt);
+            Path path = Paths.get(fileDestEx);
+            Files.write(path, exBy);
+            path = Paths.get(fileDestExQual);
+            Files.write(path, exQual);
+            path = Paths.get(fileDestPbwtQual);
+            Files.write(path, pbwtQual);
+            path = Paths.get(fileDestPbwt);
+//            Path path = Paths.get(fileDestPbwt);
             Files.write(path, pbwt);
             	
         } catch (IOException e) {
@@ -59,7 +60,7 @@ public class MainEncoding {
 		
 		long lend1 = System.currentTimeMillis();
 		long time = (lend1 - lstart1);
-		System.out.println(time);
+		System.out.println(time/1000);
 		System.out.println("Using time："+time/1000/60/60+" h:"+time/1000/60%60+" m:"+time/1000%60+" s");
 	}
 	
@@ -71,7 +72,7 @@ public class MainEncoding {
 		
 		// define huffman tree
 		Huffman2 huffman = new Huffman2();
-		String rateText = "AAACCCTTTGGG||ND";
+		String rateText = "AAACCCTTTGGG||DN";	//crazy：暂时把N的情况删除
 //		String rawText = "ACCCGGGTTTTTTT||||AA";
 		huffman.handleRate(rateText);	//liyang:建立哈弗曼树
 		
@@ -88,7 +89,40 @@ public class MainEncoding {
 //		System.out.println(rawText.toString());
 		
 		// encoding Text
-		String encodedResult = Huffman2.encodeText(rawText.toString());			//liyang:完成了编码操作
+		// crazy:既然哈弗曼编码慢，那我们就直接不建立树，不去搜，直接if进行加，时间复杂度就是O（n）量级的
+//		String encodedResult = Huffman2.encodeText(rawText.toString());			//liyang:完成了编码操作
+		String[] str = Huffman2.encodeText2(rawText.toString());
+//		char code;
+//		String encodedResult = "";
+//		for(int i=0;i<rawText.length();i++)
+//		{
+//			code = rawText.charAt(i);
+//			if(code =='A')
+//			{
+//				encodedResult = encodedResult.concat("111");
+//			}
+//			else if(code =='T')
+//			{
+//				encodedResult = encodedResult.concat("110");
+//			}
+//			else if(code =='C')
+//			{
+//				encodedResult = encodedResult.concat("10");
+//			}
+//			else if(code =='G')
+//			{
+//				encodedResult = encodedResult.concat("00");
+//			}
+//			else if(code =='D')
+//			{
+//				encodedResult = encodedResult.concat("010");
+//			}
+//			else
+//			{
+//				encodedResult = encodedResult.concat("011");
+//			}
+//		}
+		
 		
 		// TODO 这里临时性地进行强制填充
 		/*System.out.println(encodedResult.length());
@@ -97,18 +131,28 @@ public class MainEncoding {
 		}*/
 		
 		
-		System.out.println("encodedResult.length（the number of 1 or 0）:\t"+ encodedResult.length()+"\t");
+//		System.out.println("encodedResult.length（the number of 1 or 0）:\t"+ encodedResult.length()+"\t");
 		// store the result
 		// 把正则表达式引入进来,然后进行处理,并切分,这样个数也会变得非常显然了.代码质量直接决定效率,生命.工程手法上面可以补充很多
-		String[] str =encodedResult.split("(?<=\\G.{16})");	//liyang:暂时理解为16个截取一下
-		System.out.println("str.length:\t" + str.length);
+//		String[] str =encodedResult.split("(?<=\\G.{16})");	//liyang:暂时理解为16个截取一下
+		System.out.println("str.length:\t" + str.length);	//crazy:这里注意str.length进行过修改
+		int length=0;	//crazy:用于记录str真正的长度；
+		for(int i=0;i<str.length;i++)
+		{
+			if(str[i]=="")
+			{
+				length = i+1;
+				break;
+			}
+		}
+		System.out.println("str.length:\t" + length);
 		ByteBuffer bytes = ByteBuffer.allocate(str.length*2);		//liyang:开辟双倍内存，short占用两个字节
-		for(int i = 0; i < str.length - 1; i++){
+		for(int i = 0; i < length - 1; i++){
 //			System.out.println("bytes.postiton:\t"+bytes.position());
 			bytes.putShort((short)(Integer.parseInt(str[i],2)));
 		}
 		//最后一个位置再拼凑一下然后放进去
-		String strTemp = str[str.length-1];
+		String strTemp = str[length-1];
 		if(strTemp.length() < 16){
 			for(int num = 16 - strTemp.length(); num  > 0; num-- ){
 				strTemp +="1";
@@ -247,6 +291,7 @@ public class MainEncoding {
 			eQual.put((byte)(keys.get(i)*32 + values.get(i) - 128));
 		}
 		byte[] eQual2By = eQual.array();
+		System.out.println("exception length:"+eQual2By.length);
 		return eQual2By;
 	}
 	
@@ -254,28 +299,35 @@ public class MainEncoding {
 	public byte[] EncodePbwtQual(VerticalEncoding vE){
 //		VerticalEncoding vE = new VerticalEncoding();
 		ArrayList<ArrayList<Character>>  exceptionQual = vE.getPbwtQual();
-		vE.PrintResult();
+//		vE.PrintResult();
 		
 		ArrayList<ArrayList<Integer>> pbwtQualProc = new ArrayList<ArrayList<Integer>>();
 		for(ArrayList<Character> qualList : exceptionQual){
 			ArrayList<Integer> qualProc = new ArrayList<Integer>();
 			for(Character ch : qualList){
 					if(ch-33 < 10){
-						qualProc.add(QualEnum.six.ordinal());
+						qualProc.add(QualEnum.six.ordinal());	//1
 					}else if(ch-33 < 20){
-						qualProc.add(QualEnum.fifteen.ordinal());
+						qualProc.add(QualEnum.fifteen.ordinal());	//2
 					}else if(ch-33 < 25){
-						qualProc.add(QualEnum.twenty.ordinal());
+						qualProc.add(QualEnum.twenty.ordinal());	//3
 					}else if(ch-33 < 30){
-						qualProc.add(QualEnum.thirty_three.ordinal());
+						qualProc.add(QualEnum.thirty_three.ordinal());	//5
 					}else if(ch -33 < 40){
-						qualProc.add(QualEnum.thirty_seven.ordinal());	
+						qualProc.add(QualEnum.thirty_seven.ordinal());		//6
 					}else{
-						qualProc.add(QualEnum.forty.ordinal());			
+						qualProc.add(QualEnum.forty.ordinal());			//7
 					}
 			}
 			pbwtQualProc.add(qualProc);
 		}
+		
+//		System.out.println(QualEnum.six.ordinal());
+//		System.out.println(QualEnum.fifteen.ordinal());
+//		System.out.println(QualEnum.twenty.ordinal());
+//		System.out.println(QualEnum.thirty_three.ordinal());
+//		System.out.println(QualEnum.thirty_seven.ordinal());
+//		System.out.println(QualEnum.forty.ordinal());
 		// 打印输出一下处理后的结果
 		/*for(ArrayList<Integer> list : pbwtQualProc){
 			System.out.println(list.toString());
@@ -315,9 +367,9 @@ public class MainEncoding {
 			}
 		}
 		//输出一下处理后的结果
-		/*for(int i = 0; i < keys.size(); i++){
-			System.out.println(keys.get(i) + "\t" + values.get(i));
-		}*/
+//		for(int i = 0; i < keys.size()/2; i++){
+//			System.out.println(keys.get(i) + "\t" + values.get(i));
+//		}
 		//输出一下PBWTQUAL的大小
 //		System.out.println("pbwtQual size :\t"+keys.size());
 		//这里改变一下处理策略，按照原有的处理策略，这里只需要保留Keys值就足够了，结合PBWT就能找到Value,那这里就需要拼凑了
@@ -464,7 +516,7 @@ public class MainEncoding {
 		  /*
 		//调用一下反解回来
 		DecodePbwt(key2by, value2by);*/
-		
+//		DecodePbwt(key2by, value2by);
 		return key2by;
 		
 		

@@ -26,15 +26,15 @@ public class ReadPreProcess {
 	
 	public static void main(String[] args) {
 		ReadPreProcess readPreProcess = new ReadPreProcess();
-		String filePath = "/home/yangli/Documents/compress/10X/NC_10X.fastq.sorted.bam";//"/home/rivers/riversdoc/test.sorted.bam";
+		String filePath = "/home/yangli/Documents/compress/50X/NC_50X.fastq.sorted.bam";//"/home/rivers/riversdoc/test.sorted.bam";
 //		String filePath = "/home/rivers/riversdoc/compress/chr21.fa.fasta.sam.copy2";
-//		String filePath = "/home/liyang/Document/compress/input/10X/NC_10X.fastq.sorted.bam";
+//		String filePath = "/home/liyang/Document/compress/input/50X/NC_50X.fastq.sorted.bam";
 		List<List<ReadInfo>> readInfos = readPreProcess.splitBamFile(filePath);
 		//就在这里，把结果输出去看一下
 		try{
 			//这部分内容输出的很OK，没有任何的问题
-			PrintWriter writer = new PrintWriter("/home/yangli/Documents/compress/documents/readResult2.txt", "UTF-8");	///home/rivers/riversdoc/compress/readResult.txt
-//			PrintWriter writer = new PrintWriter("/home/liyang/Document/compress/output/test1.txt", "UTF-8");
+			PrintWriter writer = new PrintWriter("/home/yangli/Documents/compress/documents/50X-readResult2.txt", "UTF-8");	///home/rivers/riversdoc/compress/readResult.txt
+//			PrintWriter writer = new PrintWriter("/home/liyang/Document/compress/output/50X/50X-all/50X-readResult2.txt", "UTF-8");
 			System.out.println("The first list.size:\t" + readInfos.get(0).size());	//liyang：取第一份kmod
 			System.out.println("The second list.size:\t" + readInfos.get(1).size());	//liyang:这个是自己加的
 			System.out.println("The last list.size:\t" + readInfos.get(readInfos.size()-1).size());	//liyang:这个是自己加的
@@ -57,8 +57,8 @@ public class ReadPreProcess {
 		try {
 			//这部分是有问题的，问题主要在于最后的END，在SS的情形下，处理是不正确的
 			//上面注释的这个问题应该解决了，后续再验证一遍，同时去掉无意义的注释
-			PrintWriter writer = new PrintWriter("/home/yangli/Documents/compress/documents/readProcessResult2.txt", "UTF-8");	///home/rivers/riversdoc/compress/readProcessResult.txt
-//			PrintWriter writer = new PrintWriter("/home/liyang/Document/compress/output/test2.txt", "UTF-8");
+			PrintWriter writer = new PrintWriter("/home/yangli/Documents/compress/documents/50X-readProcessResult2.txt", "UTF-8");	///home/rivers/riversdoc/compress/readProcessResult.txt
+//			PrintWriter writer = new PrintWriter("/home/liyang/Document/compress/output/50X/50X-all/50X-readProcessResult2.txt", "UTF-8");
 			for (int i =0; i < processResult.getReadsInfo().size(); i++){
 				writer.println("reads After process:\t" + processResult.getReadsInfo().get(i).getReads());
 				writer.println("startAlignmemt:\t" + processResult.getReadsInfo().get(i).getAlignmentStart());
@@ -90,7 +90,7 @@ public class ReadPreProcess {
 		SAMRecord rec = null;
 		List<List<ReadInfo>> readInfos = new ArrayList<List<ReadInfo>>();
 		int count = 0;
-		int kMod = 100;	//每1000条reads一截断		这里为什么是20000000，不是说好的1000条为一截段		//liyang：这里原先是200000000，但是如果是1000条算作是一个的话这个数量有点大，我打算改为1000
+		int kMod = 31776;	//每1000条reads一截断		这里为什么是20000000，不是说好的1000条为一截段		//liyang：这里原先是200000000，但是如果是1000条算作是一个的话这个数量有点大，我打算改为1000
 		List<ReadInfo> readInfoList = new ArrayList<ReadInfo>();
 		
 		
@@ -265,7 +265,8 @@ public class ReadPreProcess {
 			switch(alphabet){
 				case "m":
 				case "M":
-					if(i-2 >=0 && cigars[i-2].equals("S")){		//liyang:如果说真的进入了这个if语句中，就说明了开始是S，那么这就会导致转换的E少一个
+					//crazy:这里将>=分成两种情况
+					if(i-2>=0 && cigars[i-2].equals("S")){		//liyang:如果说真的进入了这个if语句中，就说明了开始是S，那么这就会导致转换的E少一个
 						num --;		//liyang:这里应该默认ss后面必然接M
 					}
 					end = index+num;
@@ -336,7 +337,9 @@ public class ReadPreProcess {
 						exceptionInfo.add(readString.substring(index,index + num + 1));
 						exceptionQuality.add(readsQualityString.substring(index,index + num + 1));
 						index = index + num + 1;
-					} else {
+					} 
+					//crazy:我认为ss应该不会出现在中间
+					else {
 						readList.remove(readList.size() - 1);
 						exceptionInfo.add(readString.substring(index - 1,index + num));
 						//这里对质量数的处理特别化一下，用一个字符去占位处理,而且特意是字母z

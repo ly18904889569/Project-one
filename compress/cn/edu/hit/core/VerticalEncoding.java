@@ -29,14 +29,14 @@ public class VerticalEncoding {
 		ReadPreProcess readPreProcess = new ReadPreProcess();
 //		String filePath = "/home/rivers/riversdoc/test.sorted.bam";
 //		String filePath = "/home/yangli/Documents/compress/exceptionInfo/read2.fastq.sorted.bam";
-		String filePath = "/home/yangli/Documents/compress/10X/NC_10X.fastq.sorted.bam";
+//		String filePath = "/home/yangli/Documents/compress/10X/NC_10X.fastq.sorted.bam";
 //		String filePath = "/home/rivers/riversdoc/compress/chr21.fa.fasta.sam.copy2";
-//		String filePath = "/home/liyang/Document/compress/input/10X/NC_10X.fastq.sorted.bam";
+		String filePath = "/home/liyang/Document/compress/input/50X/NC_50X.fastq.sorted.bam";
 		List<List<ReadInfo>> readInfos = readPreProcess.splitBamFile(filePath);	
 		ReadsPreProcessResult reads = readPreProcess.readsProc(readInfos.get(0));
 		result = this.pbwtEncode(reads);
 		//现在是要把这个result信息进行编码，只要能把这个信息编码成功，就一定能够解压回来,看一下调用PBWTRE需要的参数就能明白了
-		System.out.println(result.getListsPBWT().size());
+//		System.out.println(result.getListsPBWT().size());
 		System.out.println("ReadPreProcess and PBWT is over");
 //		this.PrintResult();
 	}
@@ -53,18 +53,18 @@ public class VerticalEncoding {
 	
 	public void PrintResult(){
 		
-/*		for(ArrayList<String> excep : exceptionList){
+		for(ArrayList<String> excep : exceptionList){
 			System.out.println(excep);
-		}*/
+		}
 		
-	/*	for(ArrayList<String> excapQ: exceptionListQual){
+		for(ArrayList<String> excapQ: exceptionListQual){
 			System.out.println(excapQ);
-		}*/
+		}
 		
 	for(ArrayList<Character> pbwtQ: listsPbwtQual){
-//		System.out.println(pbwtQ);
+		System.out.println(pbwtQ);
 		//输出一个各个list的长度
-//		System.out.println(pbwtQ.size());
+		System.out.println(pbwtQ.size());
 	}
 		
 		
@@ -152,7 +152,7 @@ public class VerticalEncoding {
 //		}
 		// 这里加入一个排序，按照EndAlignment的顺序进行一次排序操作
 		// 输出一下比较的前后
-		Collections.sort(reads.getReadsHorizon());	//liyang:这个排序是按照end进行的排序
+		Collections.sort(reads.getReadsHorizon());	//liyang:这个排序是按照end进行的排序,这里为什么要用end，进行排序呢，非常的奇怪
 		
 //		 List<ReadsHorizonModel> readsSortByEnd = reads.getReadsHorizon();
 //		 res.setReadsHorizon(readsSortByEnd);
@@ -185,15 +185,15 @@ public class VerticalEncoding {
 		ArrayList<ReadStruct> readsCurrList = new ArrayList<ReadStruct>(); // 用来存储当前位点有效的reads序列
 		
 		//TODO:0527 确认一下start、end是按照顺序来的
-//		for(int i = 0; i < start.length; i++){
+		for(int i = 0; i < start.length; i++){
 //			System.out.println(start[i]+"\t" + end[i]);
-//			if(i>1&&start[i]<start[i-1])
-//			{
-//				System.out.println("It doesn't sort by start");
-//				System.exit(0);
-//			}
+			if(i>1&&start[i]<start[i-1])
+			{
+				System.out.println("It doesn't sort by start");
+				System.exit(0);
+			}
 //			System.out.println("The sort is OK");
-//		}
+		}
 		// 质量数这里也要处理一下,这里暂时不方便处理，就变成全局变量了，方便测试结果
 //		ArrayList<ArrayList<Character>> listsPbwtQual = new ArrayList<ArrayList<Character>>();
 		// 定义两个变量，用来表征何时要进行新序列进入和旧序列出去的计数值
@@ -201,10 +201,27 @@ public class VerticalEncoding {
 		int readsIndex = 0;	
 		// 现在思路很清晰，这部分完全可以重新改写,这部分的结束位置处理好就可以了
 		int endindex=end.length - 1;	//liyang:这么处理的原因是因为发现其实最后一个位置会出现0，而且在预处理过程中会将一些read认为是"*"，从而导致最终数量减少
-		while(end[endindex]==0)
+		//crazy:因为处理三代数据过程中数据长度变化大，并非最后一个end的就是整个reads的最大点位，需要找到最长
+		int tmp=-1;
+		for(int i=end.length-1;i>=0;i--)
 		{
-			endindex--;	//liyang:必须保证最后能够能够进入到PBWT中
+			if(end[i]>=tmp)
+			{
+				tmp = end[i];
+				endindex = i;
+			}
 		}
+//		System.out.println(end[endindex]);
+//		while(end[endindex]==0)
+//		{
+//			endindex--;	//liyang:必须保证最后能够能够进入到PBWT中
+//		}
+		System.out.println("endIndex:"+endindex);
+//		System.out.println(end.length);
+		System.out.println("prstartIndex:"+start.length);	//注意一点，在这里预处理的过程中会在最后加上一个3，所以说会长一些
+		System.out.println("The length of pbwt:"+(end[endindex]-start[0]+1+1));
+
+		
 		for (int pos = start[0]; pos <= end[endindex] + 1; pos++) {			//liyang:大循环遍历所有的位置
 			//TODO:这里针对为0 的情形特殊处理一下,为什么这里要对起始位置为0的特殊处理一下？
 			if(pos == 0){
@@ -245,7 +262,7 @@ public class VerticalEncoding {
 							if (curVal == ReadElemEnum.END.ordinal()) {
 								removeIndex.add(i);
 							}
-							a.add(curVal);
+							a.add(curVal);	//crazy:这里注意一下当为结束符号3的时候同样也会加入到其中
 							qualA.add(curValQual);
 							
 						} else if (preVal == 1) {
@@ -374,7 +391,7 @@ public class VerticalEncoding {
 		for (int col = 0; col < listsPBWT.size(); col++) {
 			preSize = readsCurrListTemp.size();
 			currSize = listsPBWT.get(col).size();	//liyang：没有currsize的大小是1,这就说明了这里只是拿出了第一个容器
-			currAddSize = currSize > preSize ? (currSize - preSize) : 0;
+			currAddSize = currSize > preSize ? (currSize - preSize) : 0;	//crazy：这里的目的是为了后面构造还原空间的
 			for (int i = 0; i < currAddSize; i++) {
 				ArrayList<Integer> listTemp = new ArrayList<Integer>();
 				readsCurrListTemp.add(listTemp);
@@ -477,7 +494,7 @@ public class VerticalEncoding {
 		
 		System.out.println("PBWT Convert Re.");
 //		for (int i = 0; i < readsResult.size(); i++) {
-//			System.out.print(startAlignment.get(i) + " : " + endAlignment.get(i) + "\t" + (endAlignment.get(i)- startAlignment.get(i)+2)+"\t");
+//			System.out.println(i+"	"+startAlignment.get(i) + " : " + endAlignment.get(i) + "\t" + (endAlignment.get(i)- startAlignment.get(i)+2)+"\t");
 //			for (Integer ins : readsResult.get(i)) {
 //				System.out.print(ins);
 //			}

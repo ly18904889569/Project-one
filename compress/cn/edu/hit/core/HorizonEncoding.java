@@ -26,24 +26,28 @@ public class HorizonEncoding {
 	public static void main(String[] args) {
 		VerticalEncoding encoding = new VerticalEncoding();
 		ReadPreProcess readPreProcess = new ReadPreProcess();
-		String filePath = "/home/yangli/Documents/compress/exceptionInfo/read2.fastq.sorted.bam";//"/home/rivers/riversdoc/test.sorted.bam";
-//		String filePath = "/home/yangli/Documents/compress/exceptionInfo/exceptionInfo.fastq.bam";
+		HorizonEncoding hor = new HorizonEncoding();
+//		String filePath = "/home/yangli/Documents/compress/exceptionInfo/read2.fastq.sorted.bam";//"/home/rivers/riversdoc/test.sorted.bam";
+		String filePath = "/home/yangli/Documents/compress/10X/NC_10X.fastq.sorted.bam";
 		List<List<ReadInfo>> readInfos = readPreProcess.splitBamFile(filePath);	//liyang：定义的是泛型，后面的函数就是将最原始的bam文件进行切分，这里在测试的输出结果中将现实count这个输出信息
 		ReadsPreProcessResult reads = readPreProcess.readsProc(readInfos.get(0));//liyang:这里取得每一个read，然后进行
+		
+		Byte[] by2 = hor.exceptionRL(reads);
+		
 		VerticalEncodeResult verRes = encoding.pbwtEncode(reads);	//liyang:然后进行了垂直PWBT编码
 		
 		
-		HorizonEncoding hor = new HorizonEncoding();
+//		HorizonEncoding hor = new HorizonEncoding();
 		//对这里的处理，逐个验证有效性
 		Byte[] by1 = hor.readsRL(verRes);	//liyang：进行了运行长度编码
 		System.out.println("by1.length:\t" + by1.length);
 //		Byte[] by2 = hor.exceptionRL(reads);	//liyang:加上就会报错，暂时不知道哪里出了问题
-//		Byte[] by3 = hor.horizonRL(reads.getReadsHorizon());
+		Byte[] by3 = hor.horizonRL(reads.getReadsHorizon());
 		
 		
 		//写入文件操作
 		String fileDest1 = "/home/yangli/Documents/compress/documents/by1.txt";//"/home/rivers/riversdoc/compress/by1.txt";
-//		String fileDest2 = "/home/yangli/Documents/compress/documents/by2.txt";//"/home/rivers/riversdoc/compress/by2.txt";
+		String fileDest2 = "/home/yangli/Documents/compress/documents/by2.txt";//"/home/rivers/riversdoc/compress/by2.txt";
 //		String fileDest3 = "/home/yangli/Documents/compress/documents/by3.txt";//"/home/rivers/riversdoc/compress/by3.txt";
 		
 		HorizonEncoding.writeBytesToFileNio(ArrayUtils.toPrimitive(by1), fileDest1);	//liyang:将10进制文件转换为2进制
@@ -113,16 +117,16 @@ public class HorizonEncoding {
 		// TODO 这部分内容要改，垂直编码的东西，在这部分进行压缩编码的时候，需要调整的东西还很多
 		//liyang：这里i的范围20设置的理由是什么？
 		//可以输出一下编码的长度
-		System.out.println();
-		System.out.println("print the key and value of preface 20");
-		for(int i = 0; i < 20; i++){
-			System.out.print(keys.get(i)+" ");
-		}
-		System.out.println();
-		for(int i = 0; i < 20; i++){
-			System.out.print(values.get(i)+" ");
-		}
-		System.out.println();
+//		System.out.println();
+//		System.out.println("print the key and value of preface 20");
+//		for(int i = 0; i < 20; i++){
+//			System.out.print(keys.get(i)+" ");
+//		}
+//		System.out.println();
+//		for(int i = 0; i < 20; i++){
+//			System.out.print(values.get(i)+" ");
+//		}
+//		System.out.println();
 //		for(int i=0; i<20; i++)
 //		{
 //			System.out.println(listsPBWT.get(i));
@@ -164,9 +168,9 @@ public class HorizonEncoding {
 		}
 		
 		//打印看一下结果 
-		for(int i = 0; i < bys.size(); i++){
-			System.out.print(bys.get(i)+" ");
-		}
+//		for(int i = 0; i < bys.size(); i++){
+//			System.out.print(bys.get(i)+" ");
+//		}
 		
 		//反解回去一下，验证结果的正确性
 		rlByteConvertRe(bys);
@@ -196,14 +200,14 @@ public class HorizonEncoding {
 			}
 		}
 		
-		System.out.println();
-		for(int i = 0; i < 20; i++){
-			System.out.print(keysRe.get(i)+" ");
-		}
-		System.out.println();
-		for(int i = 0; i < 20; i++){
-			System.out.print(valuesRe.get(i)+" ");
-		}
+//		System.out.println();
+//		for(int i = 0; i < 20; i++){
+//			System.out.print(keysRe.get(i)+" ");
+//		}
+//		System.out.println();
+//		for(int i = 0; i < 20; i++){
+//			System.out.print(valuesRe.get(i)+" ");
+//		}
 	}
 	
 	/**
@@ -280,18 +284,18 @@ public class HorizonEncoding {
 		bys.add((byte)(by0 << 4 + by1));
 		
 		System.out.println();
-		for(int i = 0; i< 50; i++){
-			if (null != reads.getReadsInfo().get(i).getExceptionInfo()){
-				System.out.println(reads.getReadsInfo().get(i).getExceptionInfo());
-			}
-		}
-		
-		System.out.println();
+//		for(int i = 0; i< 10; i++){
+//			if (null != reads.getReadsInfo().get(i).getExceptionInfo()){
+//				System.out.println(reads.getReadsInfo().get(i).getExceptionInfo());
+//			}
+//		}
+//		
+//		System.out.println();
 		//输出一下结果看一下
-		for(int i = 0; i < 300; i++){
-			String s2 = String.format("%8s", Integer.toBinaryString(bys.get(i) & 0xFF)).replace(' ', '0');//String.format单个占位符
-			System.out.print(s2+" ");
-		}
+//		for(int i = 0; i < 300; i++){
+//			String s2 = String.format("%8s", Integer.toBinaryString(bys.get(i) & 0xFF)).replace(' ', '0');//String.format单个占位符
+//			System.out.print(s2+" ");
+//		}
 		
 		
 		// 反解回来，就可以验证其正确性了

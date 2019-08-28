@@ -47,8 +47,8 @@ public class ReadsHorizonModel implements Comparable{	//comparable是个借口�
 	@Override
 	public int compareTo(Object o) {
 		ReadsHorizonModel m = (ReadsHorizonModel) o;
-		return this.alignmentEnd - m.alignmentEnd;	//liyang:这个是实现了按照end进行生序排列
-//		return this.alignmentStart - m.alignmentStart;
+//		return this.alignmentEnd - m.alignmentEnd;	//liyang:这个是实现了按照end进行生序排列
+		return this.alignmentStart - m.alignmentStart;
 	}
 
 }
