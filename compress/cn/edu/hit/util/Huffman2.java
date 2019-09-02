@@ -71,10 +71,13 @@ public class Huffman2 {
 				if (tmpNode.character.length() == 1){
 					decoded += tmpNode.character;
 				}else
+				{
 					System.out.println("Input not Valid");	//压缩后的序列反解回来出错
+					System.out.println(tmpNode.character);
+				}
 
 		}
-//		System.out.println("Decoded Text: " + decoded);
+		System.out.println("Decoded Text: " + decoded);
 		return decoded;
 	}
 

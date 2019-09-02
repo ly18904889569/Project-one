@@ -33,14 +33,14 @@ public class MainEncoding {
 		
 		System.out.println("The encoding is end");
 		//进行一下写文件的操作
-		String fileDestEx = "/home/liyang/Document/compress/output/50X/50X-all/exBy";
-		String fileDestExQual ="/home/liyang/Document/compress/output/50X/50X-all/exQual";
-		String fileDestPbwtQual = "/home/liyang/Document/compress/output/50X/50X-all/pbwtQual";
-		String fileDestPbwt = "/home/liyang/Document/compress/output/50X/50X-all/pbwt";
-//		String fileDestEx = "/home/yangli/Documents/compress/exBy1";
-//		String fileDestExQual ="/home/yangli/Documents/compress/exQual1";
-//		String fileDestPbwtQual = "/home/yangli/Documents/compress/pbwtQual1";
-//		String fileDestPbwt = "/home/yangli/Documents/compress/pbwt1";
+//		String fileDestEx = "/home/liyang/Document/compress/output/50X/50X-all/exBy";
+//		String fileDestExQual ="/home/liyang/Document/compress/output/50X/50X-all/exQual";
+//		String fileDestPbwtQual = "/home/liyang/Document/compress/output/50X/50X-all/pbwtQual";
+//		String fileDestPbwt = "/home/liyang/Document/compress/output/50X/50X-all/pbwt";
+		String fileDestEx = "/home/yangli/Documents/compress/exBy1";
+		String fileDestExQual ="/home/yangli/Documents/compress/exQual1";
+		String fileDestPbwtQual = "/home/yangli/Documents/compress/pbwtQual1";
+		String fileDestPbwt = "/home/yangli/Documents/compress/pbwt1";
 		try {
             Path path = Paths.get(fileDestEx);
             Files.write(path, exBy);

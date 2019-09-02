@@ -90,7 +90,7 @@ public class ReadPreProcess {
 		SAMRecord rec = null;
 		List<List<ReadInfo>> readInfos = new ArrayList<List<ReadInfo>>();
 		int count = 0;
-		int kMod = 31776;	//每1000条reads一截断		这里为什么是20000000，不是说好的1000条为一截段		//liyang：这里原先是200000000，但是如果是1000条算作是一个的话这个数量有点大，我打算改为1000
+		int kMod = 200;	//每1000条reads一截断		这里为什么是20000000，不是说好的1000条为一截段		//liyang：这里原先是200000000，但是如果是1000条算作是一个的话这个数量有点大，我打算改为1000
 		List<ReadInfo> readInfoList = new ArrayList<ReadInfo>();
 		
 		

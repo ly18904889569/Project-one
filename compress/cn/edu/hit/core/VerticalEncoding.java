@@ -29,9 +29,9 @@ public class VerticalEncoding {
 		ReadPreProcess readPreProcess = new ReadPreProcess();
 //		String filePath = "/home/rivers/riversdoc/test.sorted.bam";
 //		String filePath = "/home/yangli/Documents/compress/exceptionInfo/read2.fastq.sorted.bam";
-//		String filePath = "/home/yangli/Documents/compress/10X/NC_10X.fastq.sorted.bam";
+		String filePath = "/home/yangli/Documents/compress/50X/NC_50X.fastq.sorted.bam";
 //		String filePath = "/home/rivers/riversdoc/compress/chr21.fa.fasta.sam.copy2";
-		String filePath = "/home/liyang/Document/compress/input/50X/NC_50X.fastq.sorted.bam";
+//		String filePath = "/home/liyang/Document/compress/input/50X/NC_50X.fastq.sorted.bam";
 		List<List<ReadInfo>> readInfos = readPreProcess.splitBamFile(filePath);	
 		ReadsPreProcessResult reads = readPreProcess.readsProc(readInfos.get(0));
 		result = this.pbwtEncode(reads);
@@ -161,7 +161,7 @@ public class VerticalEncoding {
 //		 m.getAlignmentEnd()); }	//liyang:zhushidiao
 		 
 		// 测试恢复解码
-//		PBWTAlgoRe(pbwtResult, reads.getReadsHorizon());
+		PBWTAlgoRe(pbwtResult, reads.getReadsHorizon());
 		return res;//liyang:这个函数主要是首先将read存储到readstruct这个结构体中，然后处理每个read放到readslist中
 	}				//最后交给PBWT进行编码。
 
