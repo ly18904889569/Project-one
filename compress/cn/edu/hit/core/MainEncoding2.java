@@ -2,6 +2,7 @@ package cn.edu.hit.core;
 
 import java.awt.geom.Line2D;
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -14,6 +15,7 @@ import java.util.PrimitiveIterator.OfDouble;
 import java.util.concurrent.TimeUnit;
 import javax.swing.text.AbstractDocument.LeafElement;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.tools.ant.filters.FixCrLfFilter.AddAsisRemove;
 import org.apache.tools.ant.taskdefs.Exit;
 import org.apache.tools.ant.taskdefs.optional.clearcase.ClearCase;
 import org.tukaani.xz.simple.PowerPC;
@@ -43,7 +45,6 @@ public class MainEncoding2
 		
 		Test1 testOne = new Test1();
 		
-		
 //		byte[] exBy = encoding.EncodeExceptionList(testOne.exceptionList);
 //		String[] dexBy = encoding.deEncodeExceptionList(exBy);
 //		if (encoding.dexIsTrue(testOne.exceptionList,dexBy))
@@ -68,6 +69,90 @@ public class MainEncoding2
 		System.out.println("********************End********************");
 	}
 
+	private ArrayList<Character> deEncodeQual2(byte[] pbwtQual)
+	{
+		ArrayList<Character> dexQual2 = new ArrayList<>();
+		char[] deStr = new char[8];
+		char[] deStr2 = new char[3];
+		char[] deStr3 = new char[6];
+		if (pbwtQual.length%3 == 0)
+		{
+			for(int i=0; i<pbwtQual.length; i+=3)
+			{
+				deStr[0] = (char)((byte) ((((pbwtQual[i]+128)&0xff) >> 5)%8));
+				dexQual2.add(TranforOr(deStr[0]));
+				deStr[1] = (char)((byte) (((pbwtQual[i]&0xff) >> 2)%8));
+				dexQual2.add(TranforOr(deStr[1]));
+				deStr[2] = (char)((byte) ((((pbwtQual[i]&0xff)%4)*2)+((((pbwtQual[i+1]+128)&0xff) >> 7)%2)));
+				dexQual2.add(TranforOr(deStr[2]));
+				deStr[3] = (char)((byte) (((pbwtQual[i+1]&0xff) >> 4)%8));
+				dexQual2.add(TranforOr(deStr[3]));
+				deStr[4] = (char)((byte) (((pbwtQual[i+1]&0xff) >> 1)%8));
+				dexQual2.add(TranforOr(deStr[4]));
+				deStr[5] = (char)((byte) ((((pbwtQual[i+1]&0xff)%2)*4)+((((pbwtQual[i+2]+128)&0xff) >> 6)%4)));
+				dexQual2.add(TranforOr(deStr[5]));
+				deStr[6] = (char)((byte) (((pbwtQual[i+2]&0xff) >> 3)%8));
+				dexQual2.add(TranforOr(deStr[6]));
+				deStr[7] = (char)((byte) ((pbwtQual[i+2]&0xff)%8));
+				dexQual2.add(TranforOr(deStr[7]));
+				System.out.println();
+				
+				
+			}
+		}
+		
+		else
+		{
+			// 需要在循环终止条件上减去3，因为最后一个不一定正合适
+			for(int i=0; i<pbwtQual.length - 3; i+=3)
+			{
+				deStr[0] = (char)((byte) ((((pbwtQual[i]+128)&0xff) >> 5)%8));
+				dexQual2.add(TranforOr(deStr[0]));
+				deStr[1] = (char)((byte) (((pbwtQual[i]&0xff) >> 2)%8));
+				dexQual2.add(TranforOr(deStr[1]));
+				deStr[2] = (char)((byte) ((((pbwtQual[i]&0xff)%4)*2)+((((pbwtQual[i+1]+128)&0xff) >> 7)%2)));
+				dexQual2.add(TranforOr(deStr[2]));
+				deStr[3] = (char)((byte) (((pbwtQual[i+1]&0xff) >> 4)%8));
+				dexQual2.add(TranforOr(deStr[3]));
+				deStr[4] = (char)((byte) (((pbwtQual[i+1]&0xff) >> 1)%8));
+				dexQual2.add(TranforOr(deStr[4]));
+				deStr[5] = (char)((byte) ((((pbwtQual[i+1]&0xff)%2)*4)+((((pbwtQual[i+2]+128)&0xff) >> 6)%4)));
+				dexQual2.add(TranforOr(deStr[5]));
+				deStr[6] = (char)((byte) (((pbwtQual[i+2]&0xff) >> 3)%8));
+				dexQual2.add(TranforOr(deStr[6]));
+				deStr[7] = (char)((byte) ((pbwtQual[i+2]&0xff)%8));
+				dexQual2.add(TranforOr(deStr[7]));
+				System.out.println();
+
+			}
+			// 多出一个字节的情况，策略就是全部还原，可能会多出来几个，但是最后拼接的时候就没了
+			if (pbwtQual.length%3 ==1)
+			{
+				deStr2[0] = (char)((byte) ((((pbwtQual[pbwtQual.length-1]+128)&0xff) >> 5)%8));
+				deStr2[1] = (char)((byte) (((pbwtQual[pbwtQual.length-1]&0xff) >> 2)%8));
+				dexQual2.add(TranforOr(deStr2[0]));
+				dexQual2.add(TranforOr(deStr2[1]));
+//				System.out.print(" " + deStr2[0] + " " + deStr2[1] );
+			}
+			// 多出两个字节的情况，全部还原
+			if (pbwtQual.length%3 ==2)
+			{
+				deStr3[0] = (char)((byte) ((((pbwtQual[pbwtQual.length-2]+128)&0xff) >> 5)%8));
+				dexQual2.add(TranforOr(deStr3[0]));
+				deStr3[1] = (char)((byte) (((pbwtQual[pbwtQual.length-2]&0xff) >> 2)%8));
+				dexQual2.add(TranforOr(deStr3[1]));
+				deStr3[2] = (char)((byte) ((((pbwtQual[pbwtQual.length-2]&0xff)%4)*2)+((((pbwtQual[pbwtQual.length-1]+128)&0xff) >> 7)%2)));
+				dexQual2.add(TranforOr(deStr3[2]));
+				deStr3[3] = (char)((byte) (((pbwtQual[pbwtQual.length-1]&0xff) >> 4)%8));
+				dexQual2.add(TranforOr(deStr3[3]));
+				deStr3[4] = (char)((byte) (((pbwtQual[pbwtQual.length-1]&0xff) >> 1)%8));
+				dexQual2.add(TranforOr(deStr3[4]));
+			}
+		}
+		
+		return dexQual2;
+	}
+	
 	private ArrayList<String> deEncodeQual(byte[] pbwtQual)
 	{
 		ArrayList<String> dexQual = new ArrayList<>();
@@ -1746,6 +1831,47 @@ private ReadPbwtResult PBWTAlgo(ArrayList<ReadStruct> readsList, Integer[] start
 			str = String.valueOf(0);	// 包含0和4的情况，0不用说了不会出现，4是压缩过程中故意舍掉的具体为啥不知道
 		}
 		return str;
+	}
+	
+	private char TranforOr(char ch)
+	{
+		Random random = new Random();
+		char temp;	
+		if (ch == '1')
+		{
+			temp = Character.valueOf((char) (33 + random.nextInt(10)));
+		}
+		else if (ch == '2') 
+		{
+			temp = Character.valueOf((char) (43 + random.nextInt(10)));
+		}
+		else if (ch == '3')
+		{
+			temp = Character.valueOf((char) (54 + random.nextInt(5)));
+		}
+		else if (ch == '4')
+		{
+			temp = Character.valueOf((char) (59 + random.nextInt(5)));
+		}
+		else if (ch == '5') 
+		{
+			temp = Character.valueOf((char) (64 + random.nextInt(5)));
+		}
+		else if (ch == '6') 
+		{
+			temp = Character.valueOf((char) (69 + random.nextInt(5)));
+		}
+		else if (ch == '7') 
+		{
+			temp = Character.valueOf((char) (74 + random.nextInt(10)));
+		}
+		else 
+		{
+			temp = Character.valueOf((char) 0);
+	// 包含0和4的情况，0不用说了不会出现，4是压缩过程中故意舍掉的具体为啥不知道
+		}
+		return temp;
+		
 	}
 	
 	private static byte[] compressStartPos(int[] start)
