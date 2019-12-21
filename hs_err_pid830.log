@@ -1,0 +1,81 @@
+#
+# There is insufficient memory for the Java Runtime Environment to continue.
+# Native memory allocation (mmap) failed to map 206569472 bytes for committing reserved memory.
+# Possible reasons:
+#   The system is out of physical RAM or swap space
+#   In 32 bit mode, the process size limit was hit
+# Possible solutions:
+#   Reduce memory load on the system
+#   Increase physical memory or swap space
+#   Check if swap backing store is full
+#   Use 64 bit Java on a 64 bit OS
+#   Decrease Java heap size (-Xmx/-Xms)
+#   Decrease number of Java threads
+#   Decrease Java thread stack sizes (-Xss)
+#   Set larger code cache with -XX:ReservedCodeCacheSize=
+# This output file may be truncated or incomplete.
+#
+#  Out of Memory Error (os_linux.cpp:2640), pid=830, tid=0x00007f204aded700
+#
+# JRE version: Java(TM) SE Runtime Environment (8.0_181-b13) (build 1.8.0_181-b13)
+# Java VM: Java HotSpot(TM) 64-Bit Server VM (25.181-b13 mixed mode linux-amd64 compressed oops)
+# Failed to write core dump. Core dumps have been disabled. To enable core dumping, try "ulimit -c unlimited" before starting Java again
+#
+
+---------------  T H R E A D  ---------------
+
+Current thread (0x00007f2070081800):  VMThread [stack: 0x00007f204aced000,0x00007f204adee000] [id=846]
+
+Stack: [0x00007f204aced000,0x00007f204adee000],  sp=0x00007f204adec0a0,  free space=1020k
+Native frames: (J=compiled Java code, j=interpreted, Vv=VM code, C=native code)
+V  [libjvm.so+0xad21aa]  VMError::report_and_die()+0x2ba
+V  [libjvm.so+0x5022db]  report_vm_out_of_memory(char const*, int, unsigned long, VMErrorType, char const*)+0x8b
+V  [libjvm.so+0x92fe33]  os::Linux::commit_memory_impl(char*, unsigned long, bool)+0x123
+V  [libjvm.so+0x930059]  os::pd_commit_memory(char*, unsigned long, unsigned long, bool)+0x29
+V  [libjvm.so+0x9272ba]  os::commit_memory(char*, unsigned long, unsigned long, bool)+0x2a
+V  [libjvm.so+0x99d2e3]  PSVirtualSpace::expand_by(unsigned long)+0x53
+V  [libjvm.so+0x98dba0]  PSOldGen::expand(unsigned long)+0x170
+V  [libjvm.so+0x98ddab]  PSOldGen::resize(unsigned long)+0x1cb
+V  [libjvm.so+0x995ab1]  PSParallelCompact::invoke_no_policy(bool)+0x991
+V  [libjvm.so+0x99b40d]  PSScavenge::invoke()+0x1ad
+V  [libjvm.so+0x951d70]  ParallelScavengeHeap::failed_mem_allocate(unsigned long)+0x70
+V  [libjvm.so+0xad3c27]  VM_ParallelGCFailedAllocation::doit()+0x97
+V  [libjvm.so+0xadb745]  VM_Operation::evaluate()+0x55
+V  [libjvm.so+0xad9b0a]  VMThread::evaluate_operation(VM_Operation*)+0xba
+V  [libjvm.so+0xad9e8e]  VMThread::loop()+0x1ce
+V  [libjvm.so+0xada300]  VMThread::run()+0x70
+V  [libjvm.so+0x930198]  java_start(Thread*)+0x108
+
+VM_Operation (0x00007f20788ef370): ParallelGCFailedAllocation, mode: safepoint, requested by thread 0x00007f207000b800
+
+
+---------------  P R O C E S S  ---------------
+
+Java Threads: ( => current thread )
+  0x00007f20700e6000 JavaThread "Service Thread" daemon [_thread_blocked, id=855, stack(0x00007f204a05a000,0x00007f204a15b000)]
+  0x00007f20700c9000 JavaThread "C1 CompilerThread3" daemon [_thread_blocked, id=853, stack(0x00007f204a15b000,0x00007f204a25c000)]
+  0x00007f20700c7000 JavaThread "C2 CompilerThread2" daemon [_thread_blocked, id=852, stack(0x00007f204a25c000,0x00007f204a35d000)]
+  0x00007f20700c5000 JavaThread "C2 CompilerThread1" daemon [_thread_blocked, id=851, stack(0x00007f204a35d000,0x00007f204a45e000)]
+  0x00007f20700c2000 JavaThread "C2 CompilerThread0" daemon [_thread_blocked, id=850, stack(0x00007f204a45e000,0x00007f204a55f000)]
+  0x00007f20700c0800 JavaThread "Signal Dispatcher" daemon [_thread_blocked, id=849, stack(0x00007f204a55f000,0x00007f204a660000)]
+  0x00007f207008d800 JavaThread "Finalizer" daemon [_thread_blocked, id=848, stack(0x00007f204aaeb000,0x00007f204abec000)]
+  0x00007f207008b000 JavaThread "Reference Handler" daemon [_thread_blocked, id=847, stack(0x00007f204abec000,0x00007f204aced000)]
+  0x00007f207000b800 JavaThread "main" [_thread_blocked, id=836, stack(0x00007f20787f0000,0x00007f20788f1000)]
+
+Other Threads:
+=>0x00007f2070081800 VMThread [stack: 0x00007f204aced000,0x00007f204adee000] [id=846]
+  0x00007f20700eb000 WatcherThread [stack: 0x00007f2049f59000,0x00007f204a05a000] [id=864]
+
+VM state:at safepoint (normal execution)
+
+VM Mutex/Monitor currently owned by a thread:  ([mutex/lock_event])
+[0x00007f20700073a0] ExpandHeap_lock - owner thread: 0x00007f2070081800
+[0x00007f2070007a20] Threads_lock - owner thread: 0x00007f2070081800
+[0x00007f2070007f20] Heap_lock - owner thread: 0x00007f207000b800
+
+Heap:
+ PSYoungGen      total 425472K, used 87280K [0x00000000d7200000, 0x0000000100000000, 0x0000000100000000)
+  eden space 335872K, 0% used [0x00000000d7200000,0x00000000d7200000,0x00000000eba00000)
+  from space 89600K, 97% used [0x00000000fa880000,0x00000000ffdbc0d0,0x0000000100000000)
+  to   space 166912K, 0% used [0x00000000eba00000,0x00000000eba00000,0x00000000f5d00000)
+ ParOldGen       total 447488K, used 446206K
