@@ -4,6 +4,8 @@ import java.awt.geom.Line2D;
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -13,6 +15,8 @@ import java.util.List;
 import java.util.Random;
 import java.util.PrimitiveIterator.OfDouble;
 import java.util.concurrent.TimeUnit;
+
+import javax.swing.event.TreeSelectionEvent;
 import javax.swing.text.AbstractDocument.LeafElement;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.tools.ant.filters.FixCrLfFilter.AddAsisRemove;
@@ -31,6 +35,7 @@ import cn.edu.hit.model.ReadsPreProcessResult;
 import cn.edu.hit.model.VerticalEncodeResult;
 import cn.edu.hit.test.ReadStruct;
 import cn.edu.hit.testdata.Test1;
+import cn.edu.hit.testdata.Test2;
 import cn.edu.hit.util.Huffman2;
 import htsjdk.samtools.metrics.StringHeader;
 import htsjdk.samtools.seekablestream.ISeekableStreamFactory;
@@ -39,34 +44,56 @@ public class MainEncoding2
 {
 	static CompressResult allRes = new CompressResult();
 	
+	static ArrayList<String> exBackUp = new ArrayList<String>();
+	
 	public static void main(String[] args)
 	{
 		MainEncoding2 encoding = new MainEncoding2();
 		
-		Test1 testOne = new Test1();
+		Test1 testOne = new Test1(2);
+						
+		CompressResult CompressRes = encoding.EncodePbwt(testOne);
 		
-//		byte[] exBy = encoding.EncodeExceptionList(testOne.exceptionList);
-//		String[] dexBy = encoding.deEncodeExceptionList(exBy);
-//		if (encoding.dexIsTrue(testOne.exceptionList,dexBy))
-//		{
-//			System.out.println("The job(compress and decompress) is right!");
-//		}
-
-//		byte[] exQual = encoding.EncodeExceptionQual(testOne.exceptionListQual);
-//		ArrayList<String> dexQual = encoding.deEncodeExceptionQual(exQual);
+		ReadPbwtResult reCompressRes = encoding.DeCodePbwt(CompressRes);
 		
-//		byte[] pbwtQual = encoding.EncodePbwtQual(testOne.listsPbwtQual);
-//		ArrayList<String> deQual = encoding.deEncodeQual(pbwtQual);
-		
-		byte[] pbwt = encoding.EncodePbwt(testOne);
-		ArrayList<ArrayList<Integer>> rePbwtList = encoding.DecodePBWT(pbwt);
-		encoding.PbwtIsTrue(testOne.getListsPBWT(),rePbwtList);
-		
-//		byte[] startPos = compressStartPos(testOne.readStart);
-//		int[] deS = deStartPos(startPos);
-//		isTrue(testOne.readStart, deS);
+		ProcessIsTrue(testOne,reCompressRes);
 		
 		System.out.println("********************End********************");
+	}
+
+	/**
+	 * 验证解压缩过程的正确性
+	 * @param testOne
+	 * @param reCompressRes
+	 */
+	public static void ProcessIsTrue(Test1 testOne, ReadPbwtResult reCompressRes)
+	{
+		int[] deS = reCompressRes.getStartPos();
+		isTrue(testOne.readStart, deS);
+		
+		ArrayList<ArrayList<Integer>> rePbwtList = reCompressRes.getListsPBWT();
+		PbwtIsTrue(testOne.getListsPBWT(),rePbwtList);
+		
+		List<String> dexBy = reCompressRes.getListsExcep2();
+		dexIsTrue2(exBackUp, dexBy);
+				
+	}
+
+	private ReadPbwtResult DeCodePbwt(CompressResult compressRes)
+	{
+		ReadPbwtResult reResult = new ReadPbwtResult();
+		
+		reResult.setStartPos(deStartPos(compressRes.getStartResult()));
+		
+		reResult.setListsPBWT(DecodePBWT(compressRes.getReadsResult()));
+		
+		reResult.setListsExcep2(Arrays.asList(deEncodeExceptionList(compressRes.getExceptionResult())));
+		
+		reResult.setListsQual(deEncodeQual2(compressRes.getReadQuaReasult()));
+		
+		reResult.setListExQual2(deEncodeExceptionQual2(compressRes.getExceptionQuaResult()));
+
+		return reResult;
 	}
 
 	private ArrayList<Character> deEncodeQual2(byte[] pbwtQual)
@@ -79,25 +106,23 @@ public class MainEncoding2
 		{
 			for(int i=0; i<pbwtQual.length; i+=3)
 			{
-				deStr[0] = (char)((byte) ((((pbwtQual[i]+128)&0xff) >> 5)%8));
+				deStr[0] = (char)((byte) ((((pbwtQual[i]+128)&0xff) >> 5)%8) + 48);
 				dexQual2.add(TranforOr(deStr[0]));
-				deStr[1] = (char)((byte) (((pbwtQual[i]&0xff) >> 2)%8));
+				deStr[1] = (char)((byte) (((pbwtQual[i]&0xff) >> 2)%8) + 48);
 				dexQual2.add(TranforOr(deStr[1]));
-				deStr[2] = (char)((byte) ((((pbwtQual[i]&0xff)%4)*2)+((((pbwtQual[i+1]+128)&0xff) >> 7)%2)));
+				deStr[2] = (char)((byte) ((((pbwtQual[i]&0xff)%4)*2)+((((pbwtQual[i+1]+128)&0xff) >> 7)%2)) + 48);
 				dexQual2.add(TranforOr(deStr[2]));
-				deStr[3] = (char)((byte) (((pbwtQual[i+1]&0xff) >> 4)%8));
+				deStr[3] = (char)((byte) (((pbwtQual[i+1]&0xff) >> 4)%8) + 48);
 				dexQual2.add(TranforOr(deStr[3]));
-				deStr[4] = (char)((byte) (((pbwtQual[i+1]&0xff) >> 1)%8));
+				deStr[4] = (char)((byte) (((pbwtQual[i+1]&0xff) >> 1)%8) + 48);
 				dexQual2.add(TranforOr(deStr[4]));
-				deStr[5] = (char)((byte) ((((pbwtQual[i+1]&0xff)%2)*4)+((((pbwtQual[i+2]+128)&0xff) >> 6)%4)));
+				deStr[5] = (char)((byte) ((((pbwtQual[i+1]&0xff)%2)*4)+((((pbwtQual[i+2]+128)&0xff) >> 6)%4)) + 48);
 				dexQual2.add(TranforOr(deStr[5]));
-				deStr[6] = (char)((byte) (((pbwtQual[i+2]&0xff) >> 3)%8));
+				deStr[6] = (char)((byte) (((pbwtQual[i+2]&0xff) >> 3)%8) + 48);
 				dexQual2.add(TranforOr(deStr[6]));
-				deStr[7] = (char)((byte) ((pbwtQual[i+2]&0xff)%8));
+				deStr[7] = (char)((byte) ((pbwtQual[i+2]&0xff)%8) + 48);
 				dexQual2.add(TranforOr(deStr[7]));
 				System.out.println();
-				
-				
 			}
 		}
 		
@@ -106,21 +131,21 @@ public class MainEncoding2
 			// 需要在循环终止条件上减去3，因为最后一个不一定正合适
 			for(int i=0; i<pbwtQual.length - 3; i+=3)
 			{
-				deStr[0] = (char)((byte) ((((pbwtQual[i]+128)&0xff) >> 5)%8));
+				deStr[0] = (char)((byte) ((((pbwtQual[i]+128)&0xff) >> 5)%8)+48);
 				dexQual2.add(TranforOr(deStr[0]));
-				deStr[1] = (char)((byte) (((pbwtQual[i]&0xff) >> 2)%8));
+				deStr[1] = (char)((byte) (((pbwtQual[i]&0xff) >> 2)%8)+48);
 				dexQual2.add(TranforOr(deStr[1]));
-				deStr[2] = (char)((byte) ((((pbwtQual[i]&0xff)%4)*2)+((((pbwtQual[i+1]+128)&0xff) >> 7)%2)));
+				deStr[2] = (char)((byte) ((((pbwtQual[i]&0xff)%4)*2)+((((pbwtQual[i+1]+128)&0xff) >> 7)%2))+48);
 				dexQual2.add(TranforOr(deStr[2]));
-				deStr[3] = (char)((byte) (((pbwtQual[i+1]&0xff) >> 4)%8));
+				deStr[3] = (char)((byte) (((pbwtQual[i+1]&0xff) >> 4)%8)+48);
 				dexQual2.add(TranforOr(deStr[3]));
-				deStr[4] = (char)((byte) (((pbwtQual[i+1]&0xff) >> 1)%8));
+				deStr[4] = (char)((byte) (((pbwtQual[i+1]&0xff) >> 1)%8)+48);
 				dexQual2.add(TranforOr(deStr[4]));
-				deStr[5] = (char)((byte) ((((pbwtQual[i+1]&0xff)%2)*4)+((((pbwtQual[i+2]+128)&0xff) >> 6)%4)));
+				deStr[5] = (char)((byte) ((((pbwtQual[i+1]&0xff)%2)*4)+((((pbwtQual[i+2]+128)&0xff) >> 6)%4))+48);
 				dexQual2.add(TranforOr(deStr[5]));
-				deStr[6] = (char)((byte) (((pbwtQual[i+2]&0xff) >> 3)%8));
+				deStr[6] = (char)((byte) (((pbwtQual[i+2]&0xff) >> 3)%8)+48);
 				dexQual2.add(TranforOr(deStr[6]));
-				deStr[7] = (char)((byte) ((pbwtQual[i+2]&0xff)%8));
+				deStr[7] = (char)((byte) ((pbwtQual[i+2]&0xff)%8)+48);
 				dexQual2.add(TranforOr(deStr[7]));
 				System.out.println();
 
@@ -128,8 +153,8 @@ public class MainEncoding2
 			// 多出一个字节的情况，策略就是全部还原，可能会多出来几个，但是最后拼接的时候就没了
 			if (pbwtQual.length%3 ==1)
 			{
-				deStr2[0] = (char)((byte) ((((pbwtQual[pbwtQual.length-1]+128)&0xff) >> 5)%8));
-				deStr2[1] = (char)((byte) (((pbwtQual[pbwtQual.length-1]&0xff) >> 2)%8));
+				deStr2[0] = (char)((byte) ((((pbwtQual[pbwtQual.length-1]+128)&0xff) >> 5)%8)+48);
+				deStr2[1] = (char)((byte) (((pbwtQual[pbwtQual.length-1]&0xff) >> 2)%8)+48);
 				dexQual2.add(TranforOr(deStr2[0]));
 				dexQual2.add(TranforOr(deStr2[1]));
 //				System.out.print(" " + deStr2[0] + " " + deStr2[1] );
@@ -137,15 +162,15 @@ public class MainEncoding2
 			// 多出两个字节的情况，全部还原
 			if (pbwtQual.length%3 ==2)
 			{
-				deStr3[0] = (char)((byte) ((((pbwtQual[pbwtQual.length-2]+128)&0xff) >> 5)%8));
+				deStr3[0] = (char)((byte) ((((pbwtQual[pbwtQual.length-2]+128)&0xff) >> 5)%8)+48);
 				dexQual2.add(TranforOr(deStr3[0]));
-				deStr3[1] = (char)((byte) (((pbwtQual[pbwtQual.length-2]&0xff) >> 2)%8));
+				deStr3[1] = (char)((byte) (((pbwtQual[pbwtQual.length-2]&0xff) >> 2)%8)+48);
 				dexQual2.add(TranforOr(deStr3[1]));
-				deStr3[2] = (char)((byte) ((((pbwtQual[pbwtQual.length-2]&0xff)%4)*2)+((((pbwtQual[pbwtQual.length-1]+128)&0xff) >> 7)%2)));
+				deStr3[2] = (char)((byte) ((((pbwtQual[pbwtQual.length-2]&0xff)%4)*2)+((((pbwtQual[pbwtQual.length-1]+128)&0xff) >> 7)%2))+48);
 				dexQual2.add(TranforOr(deStr3[2]));
-				deStr3[3] = (char)((byte) (((pbwtQual[pbwtQual.length-1]&0xff) >> 4)%8));
+				deStr3[3] = (char)((byte) (((pbwtQual[pbwtQual.length-1]&0xff) >> 4)%8)+48);
 				dexQual2.add(TranforOr(deStr3[3]));
-				deStr3[4] = (char)((byte) (((pbwtQual[pbwtQual.length-1]&0xff) >> 1)%8));
+				deStr3[4] = (char)((byte) (((pbwtQual[pbwtQual.length-1]&0xff) >> 1)%8)+48);
 				dexQual2.add(TranforOr(deStr3[4]));
 			}
 		}
@@ -327,27 +352,235 @@ public class MainEncoding2
 		return dexQual2;
 	}
 
-	public boolean dexIsTrue(ArrayList<ArrayList<String>> exceptionList, String[] dexBy)
+	/**
+	 * 最大化压缩的解压
+	 * @param exQual
+	 * @return
+	 */
+	private ArrayList<Character> deEncodeExceptionQual2(byte[] exQual)
+	{
+		// 解压策略，将exqual.size（）/3 大小的正常解压,余下的分成7种情况解压
+//		ArrayList<String> dexQual = new ArrayList<>();
+		ArrayList<Character> dexQual2 = new ArrayList<>();
+		char[] deStr = new char[8];
+		char[] deStr2 = new char[3];
+		char[] deStr3 = new char[6];
+		// 如果压缩那边正好没有多余，那么就是3B还原成8B
+		if (exQual.length%3 == 0)
+		{
+			for(int i=0; i<exQual.length; i+=3)
+			{
+				deStr[0] = (char)((byte) ((((exQual[i]+128)&0xff) >> 5)%8) + 48);
+				dexQual2.add(TranforOr(deStr[0]));
+				deStr[1] = (char)((byte) (((exQual[i]&0xff) >> 2)%8) + 48);
+				dexQual2.add(TranforOr(deStr[1]));
+				deStr[2] = (char)((byte) ((((exQual[i]&0xff)%4)*2)+((((exQual[i+1]+128)&0xff) >> 7)%2)) + 48);
+				dexQual2.add(TranforOr(deStr[2]));
+				deStr[3] = (char)((byte) (((exQual[i+1]&0xff) >> 4)%8) + 48);
+				dexQual2.add(TranforOr(deStr[3]));
+				deStr[4] = (char)((byte) (((exQual[i+1]&0xff) >> 1)%8) + 48);
+				dexQual2.add(TranforOr(deStr[4]));
+				deStr[5] = (char)((byte) ((((exQual[i+1]&0xff)%2)*4)+((((exQual[i+2]+128)&0xff) >> 6)%4)) + 48);
+				dexQual2.add(TranforOr(deStr[5]));
+				deStr[6] = (char)((byte) (((exQual[i+2]&0xff) >> 3)%8) + 48);
+				dexQual2.add(TranforOr(deStr[6]));
+				deStr[7] = (char)((byte) ((exQual[i+2]&0xff)%8) + 48);
+				dexQual2.add(TranforOr(deStr[7]));
+				System.out.println();
+				
+			}
+		}
+		else
+		{
+			// 需要在循环终止条件上减去3，因为最后一个不一定正合适
+			for(int i=0; i<exQual.length - 3; i+=3)
+			{
+				deStr[0] = (char)((byte) ((((exQual[i]+128)&0xff) >> 5)%8) + 48);
+				dexQual2.add(TranforOr(deStr[0]));
+				deStr[1] = (char)((byte) (((exQual[i]&0xff) >> 2)%8) + 48);
+				dexQual2.add(TranforOr(deStr[1]));
+				deStr[2] = (char)((byte) ((((exQual[i]&0xff)%4)*2)+((((exQual[i+1]+128)&0xff) >> 7)%2)) + 48);
+				dexQual2.add(TranforOr(deStr[2]));
+				deStr[3] = (char)((byte) (((exQual[i+1]&0xff) >> 4)%8) + 48);
+				dexQual2.add(TranforOr(deStr[3]));
+				deStr[4] = (char)((byte) (((exQual[i+1]&0xff) >> 1)%8) + 48);
+				dexQual2.add(TranforOr(deStr[4]));
+				deStr[5] = (char)((byte) ((((exQual[i+1]&0xff)%2)*4)+((((exQual[i+2]+128)&0xff) >> 6)%4)) + 48);
+				dexQual2.add(TranforOr(deStr[5]));
+				deStr[6] = (char)((byte) (((exQual[i+2]&0xff) >> 3)%8) + 48);
+				dexQual2.add(TranforOr(deStr[6]));
+				deStr[7] = (char)((byte) ((exQual[i+2]&0xff)%8) + 48);
+				dexQual2.add(TranforOr(deStr[7]));
+				System.out.println();
+
+			}
+			// 多出一个字节的情况，策略就是全部还原，可能会多出来几个，但是最后拼接的时候就没了
+			if (exQual.length%3 ==1)
+			{
+				deStr2[0] = (char)((byte) ((((exQual[exQual.length-1]+128)&0xff) >> 5)%8)+48);
+				deStr2[1] = (char)((byte) (((exQual[exQual.length-1]&0xff) >> 2)%8)+48);
+				dexQual2.add(TranforOr(deStr2[0]));
+				dexQual2.add(TranforOr(deStr2[1]));
+			}
+			// 多出两个字节的情况，全部还原
+			if (exQual.length%3 ==2)
+			{
+				deStr3[0] = (char)((byte) ((((exQual[exQual.length-2]+128)&0xff) >> 5)%8)+48);
+				dexQual2.add(TranforOr(deStr3[0]));
+				deStr3[1] = (char)((byte) (((exQual[exQual.length-2]&0xff) >> 2)%8)+48);
+				dexQual2.add(TranforOr(deStr3[1]));
+				deStr3[2] = (char)((byte) ((((exQual[exQual.length-2]&0xff)%4)*2)+((((exQual[exQual.length-1]+128)&0xff) >> 7)%2))+48);
+				dexQual2.add(TranforOr(deStr3[2]));
+				deStr3[3] = (char)((byte) (((exQual[exQual.length-1]&0xff) >> 4)%8)+48);
+				dexQual2.add(TranforOr(deStr3[3]));
+				deStr3[4] = (char)((byte) (((exQual[exQual.length-1]&0xff) >> 1)%8)+48);
+				dexQual2.add(TranforOr(deStr3[4]));
+
+			}
+		}
+		System.out.println("The decompression of exQual is OK");
+		return dexQual2;
+	}
+	
+	public static boolean dexIsTrue(ArrayList<ArrayList<String>> exceptionList, String[] dexBy)
 	{
 		int index = 0;
 		for(ArrayList<String> exbase : exceptionList)
 		{
 			if(index>=dexBy.length)
+			{
+				System.out.println("The compression of ex is error!");
 				return false;
-			
+			}
 			for(int i=0; i< exbase.size();i++)
 			{
 				if(!exbase.get(i).equals(dexBy[index]))
+				{
+					System.out.println("The compression of ex is error!");
 					return false;
+				}
 				index++;
 			}
 		}
 		if(index!=dexBy.length)
+		{
+			System.out.println("The compression of ex is error!");
 			return false;
+		}
+		System.out.println("The compression of ex is right!");
 		return true;
 	}
 
-
+	private static boolean dexIsTrue2(ArrayList<String> exBackUp2, List<String> dexBy)
+	{
+		int lengthExOne = exBackUp2.size();
+		int lengthExTwo = dexBy.size();
+		if (lengthExOne != lengthExTwo)
+		{
+			System.out.println("########### The process of exList is Wrong #############");
+			return false;
+		}
+		else
+		{
+			for(int i=0; i<lengthExOne; i++)
+			{
+				if (!exBackUp.get(i).equals(dexBy.get(i)))
+				{
+					System.out.println("########### The process of exList is Wrong #############");
+					return false;
+				}
+			}
+		}
+		System.out.println("The process of exList is right!");
+		return true;
+	}
+	
+	public static void dexIsTrue(ArrayList<ArrayList<String>> exceptionList, List<String> dexBy)
+	{
+		int index = 0;
+		for(ArrayList<String> exbase : exceptionList)
+		{
+			if(index>=dexBy.size())
+			{
+				System.out.println("The compression of ex is error!");
+			}
+			for(int i=0; i< exbase.size();i++)
+			{
+				if(!exbase.get(i).equals(dexBy.get(index)))
+				{
+					System.out.println("The compression of ex is error!");
+				}
+				index++;
+			}
+		}
+		if(index!=dexBy.size())
+		{
+			System.out.println("The compression of ex is error!");
+		}
+		System.out.println("The compression of ex is right!");
+	}
+	
+	/**
+	 * 针对索引压缩的
+	 * @param array
+	 * @return
+	 */
+	public static String[] deEncodeExceptionList2(byte[] array)
+	{
+		String byte2EncodeResult = "";
+		String tempbyte2="";
+		int num=0;
+		for(int i =0; i < array.length-2; i++){
+			if (array[i] == ' ')
+			{
+				break;
+			}
+			tempbyte2 = String.format("%8s", Integer.toBinaryString(array[i] & 0xFF)).replace(' ', '0');
+			
+			num++;
+			if (num%2==1)
+			{
+				System.out.print(tempbyte2);
+			}
+			else
+			{
+				System.out.println(tempbyte2);
+			}
+			byte2EncodeResult += tempbyte2;
+		}
+		
+		String strTail = String.format("%8s", Integer.toBinaryString(array[array.length-2] & 0xFF)).replace(' ', '0')
+				+ String.format("%8s", Integer.toBinaryString(array[array.length-1] & 0xFF)).replace(' ', '0');
+		System.out.println(strTail);
+		byte2EncodeResult += strTail;
+		Huffman2 huffman = new Huffman2();
+		String rateText = "AAACCCTTTGGG||,,DN";
+		huffman.handleRate(rateText);
+		
+		String decodedResult = huffman.decodeText(byte2EncodeResult);
+		String decodeResult2 = decodedResult.substring(0, decodedResult.lastIndexOf("|"));
+//		decodeResult2+="|";		// 这里可能会影响速度，之后再改
+		
+		ArrayList<ArrayList<String>> deResult = new ArrayList<ArrayList<String>>();
+		String[] deTemp= decodeResult2.split("\\|"); 
+//		点隔开这里明天继续,注意空的问题
+		for(String str : deTemp)
+		{
+			String[] temp = str.split(",");
+			ArrayList<String> templist = new ArrayList<String>();
+			for(String str2 : temp)
+			{
+				templist.add(str2);
+			}
+		}
+		return null;
+	}
+	
+	/**
+	 * 针对最大化压缩的
+	 * @param array
+	 * @return
+	 */
 	public static String[] deEncodeExceptionList(byte[] array)
 	{
 		// 实现解压缩
@@ -405,7 +638,7 @@ public class MainEncoding2
 // 传入的vE是一个0,1序列。第一步进行动态pbwt变化，第二部进行游程编码
 // 我们在进行reads编码的过程中同时也需要编码序列的起始位置（长度先看一下）
 // 我需要在这里重新写一下pbwt变化
-	public byte[] EncodePbwt(Test1 testOne)
+	public CompressResult EncodePbwt(Test1 testOne)
 	{
 //		CompressResult allRes = new CompressResult();
 		ReadPbwtResult pbwtres = new ReadPbwtResult();
@@ -514,11 +747,12 @@ public class MainEncoding2
 //		PbwtIsTrue(pbwtResult,rePBWT);
 	
 //		在这里进行余下的几个部分的压缩工作
-		byte[] exBy = MainEncoding2.EncodeExceptionList(pbwtres.getListsExcep());
-
+		byte[] exBy = EncodeExceptionList(pbwtres.getListsExcep());
+//		MainEncoding2.deEncodeExceptionList(exBy);
 //		需要改两处，一个是质量分数都全部认为是char，然后是正常质量分数一列是一个值
-		byte[] exQual = MainEncoding2.EncodeExceptionQual(pbwtres.getListExQual());
-		byte[] pbwtQual = MainEncoding2.EncodePbwtSingleQual(pbwtres.getListsQual());
+		byte[] exQual = EncodeExceptionQual(pbwtres.getListExQual());
+		byte[] pbwtQual = EncodePbwtSingleQual(pbwtres.getListsQual());
+//		ArrayList<Character> qual = deEncodeQual2(pbwtQual);
 //		byte[] pbwtQual = MainEncoding2.EncodePbwtQual(pbwtres.getListsQual());
 		
 		allRes.setExceptionResult(exBy);
@@ -526,7 +760,7 @@ public class MainEncoding2
 		allRes.setReadQuaReasult(pbwtQual);
 		allRes.setReadsResult(keyAndValue);
 		
-		return keyAndValue;
+		return allRes;
 	}
 
 	private byte[] binaryKeys(List<Integer> keys)
@@ -713,7 +947,7 @@ private static int deCompressLen(byte[] len2)
 }
 
 // 这里还原需要把所有步骤解决，首先是二进制转换为10进制，然后在pbwt还原
-public ArrayList<ArrayList<Integer>> DecodePBWT(byte[] temp)
+public static ArrayList<ArrayList<Integer>> DecodePBWT(byte[] temp)
 {
 //	首先截取前四位为长度，然后4+长度为value。顺次解压完成之后再去解压key，在解压key的同时完成pbwt的还原工作
 	ArrayList<Integer> bValsFromByte = new ArrayList<Integer>();
@@ -793,7 +1027,7 @@ private void DecodePbwt(byte[] keys, byte[] values)
 	
 }
 
-private ArrayList<ArrayList<Integer>>reListPbwt(ArrayList<Byte> bKeysFromByte, ArrayList<Integer> bValsFromByte)
+private static ArrayList<ArrayList<Integer>>reListPbwt(ArrayList<Byte> bKeysFromByte, ArrayList<Integer> bValsFromByte)
 {
 	ArrayList<ArrayList<Integer>> reListsPBWT = new ArrayList<ArrayList<Integer>>();
 	ArrayList<Integer> pbwt = new ArrayList<Integer>();
@@ -818,7 +1052,7 @@ private ArrayList<ArrayList<Integer>>reListPbwt(ArrayList<Byte> bKeysFromByte, A
 	return reListsPBWT;
 }
 
-public boolean PbwtIsTrue(ArrayList<ArrayList<Integer>> pbwtResult, ArrayList<ArrayList<Integer>> repbwt)
+public static boolean PbwtIsTrue(ArrayList<ArrayList<Integer>> pbwtResult, ArrayList<ArrayList<Integer>> repbwt)
 {
 	for(int i=0;i<pbwtResult.size()&&i<repbwt.size(); i++)
 	{
@@ -831,7 +1065,7 @@ public boolean PbwtIsTrue(ArrayList<ArrayList<Integer>> pbwtResult, ArrayList<Ar
 			}
 		}
 	}
-	System.out.println("the Process Of pbwt is OK");
+	System.out.println("the Process Of pbwt is right!");
 	return true;
 }
 /**
@@ -839,7 +1073,7 @@ public boolean PbwtIsTrue(ArrayList<ArrayList<Integer>> pbwtResult, ArrayList<Ar
  * @param pbwtResult
  * @return
  */
-private ArrayList<ArrayList<Integer>> PBWTAlgoRe(ArrayList<ArrayList<Integer>> pbwtResult)
+private static ArrayList<ArrayList<Integer>> PBWTAlgoRe(ArrayList<ArrayList<Integer>> pbwtResult)
 {
 	PBWTReadRe pbwtReadRe = new PBWTReadRe();
 	ArrayList<ArrayList<Integer>> readsResult = new ArrayList<ArrayList<Integer>>();
@@ -1075,7 +1309,7 @@ private ReadPbwtResult PBWTAlgo(ArrayList<ReadStruct> readsList, Integer[] start
 				char curValQual = 0;	// 这里初值设置为0非常重要，应对是3的情况
 				if (curVal == 1||curVal == 0)
 				{
-//					curValQual = readsCurrList.get(i).getReadQual().get(pos - readsCurrList.get(i).getStartAlignment());
+					curValQual = readsCurrList.get(i).getReadQuality().charAt(pos - readsCurrList.get(i).getStartAlignment());
 				}
 				// 处理第一列，就是之前并没有碱基的情况
 				if (readsCurrList.get(i).getStartAlignment() == pos)
@@ -1087,6 +1321,7 @@ private ReadPbwtResult PBWTAlgo(ArrayList<ReadStruct> readsList, Integer[] start
 					else
 					{
 						exception.add(readsCurrList.get(i).getException().get(0));
+						exBackUp.add(readsCurrList.get(i).getException().get(0));
 						readsCurrList.get(i).getException().remove(0);
 //						qualB.add(curValQual);
 						exceptionQual.add(curValQual);
@@ -1116,6 +1351,7 @@ private ReadPbwtResult PBWTAlgo(ArrayList<ReadStruct> readsList, Integer[] start
 						{
 //							ArrayList<String> exception = new ArrayList<String>();
 							exception.add(readsCurrList.get(i).getException().get(0));
+							exBackUp.add(readsCurrList.get(i).getException().get(0));
 							readsCurrList.get(i).getException().remove(0);
 //							qualB.add(curValQual);
 							exceptionQual.add(curValQual);
@@ -1139,6 +1375,7 @@ private ReadPbwtResult PBWTAlgo(ArrayList<ReadStruct> readsList, Integer[] start
 						{
 //							ArrayList<String> exception = new ArrayList<String>();
 							exception.add(readsCurrList.get(i).getException().get(0));
+							exBackUp.add(readsCurrList.get(i).getException().get(0));
 							readsCurrList.get(i).getException().remove(0);
 //							qualB.add(curValQual);
 							exceptionQual.add(curValQual);
@@ -1735,7 +1972,91 @@ private ReadPbwtResult PBWTAlgo(ArrayList<ReadStruct> readsList, Integer[] start
 		return eQual2By;
 	}
 
-
+/**
+ * 针对按照序列解压缩的异常值解压缩
+ * @param vE
+ * @return
+ */
+	public static byte[] EncodeExceptionList2(ArrayList<ArrayList<String>> vE)
+	{
+		ArrayList<ArrayList<String>>  exceptionList = vE;
+		Huffman2 huffman = new Huffman2();
+		String rateText = "AAACCCTTTGGG||,,DN";
+		huffman.handleRate(rateText);
+		StringBuilder rawText = new StringBuilder();
+		for(ArrayList<String> str: exceptionList){
+			if (str.isEmpty())
+			{
+				rawText.append("|");
+			}
+			else if (str.size() == 1) 
+			{
+				rawText.append(str.get(0)+"|");
+			}
+			else 
+			{
+				int i =0;
+				while(i<str.size()-1)
+				{
+					rawText.append(str.get(i)+",");
+					i++;
+				}
+				rawText.append(str.get(i)+"|");
+			}
+		}
+		String[] str = Huffman2.encodeText2(rawText.toString());
+		
+		int length=0;	//crazy:用于记录str真正的长度；
+		for(int i=0;i<str.length;i++)
+		{
+			System.out.println(str[i]);
+			if(str[i]=="")
+			{
+				length = i;
+				break;
+			}
+			length =i+1;
+		}
+//		System.out.println();
+//		System.out.println("length : "+length);
+		for(ArrayList<String> ar : exceptionList)
+		{
+			for(String str1 : ar)
+			{
+				System.out.print(str1+"  ");
+			}
+			System.out.println();
+		}
+		System.out.println();
+//		System.out.println(length);
+		
+		ByteBuffer bytes = ByteBuffer.allocate(length*2);		//liyang:开辟双倍内存，short占用两个字节
+		for(int i = 0; i < length - 1; i++){
+//			System.out.println("bytes.postiton:\t"+bytes.position());
+			bytes.putShort((short)(Integer.parseInt(str[i],2)));
+		}
+		//最后一个位置再拼凑一下然后放进去
+//		System.out.println(str[length-1].length());
+		// ××××××××××××××××××××××××××××××××加上1没问题，但是你要怎么还原回去呢××××××××××××××××××××××××××××××××××××××××××
+		String strTemp = str[length-1];
+		if(strTemp.length() < 16)
+		{
+			for(int num = 16 - strTemp.length(); num  > 0; num-- )
+			{
+				strTemp +="1";
+			}
+		}
+		else
+		{
+			
+		}
+		bytes.putShort((short)(Integer.parseInt(strTemp, 2)));
+		byte[] array = bytes.array();
+		System.out.println("the compression of ex has completed ");
+		return array;
+	}
+	
+	
 	public static byte[] EncodeExceptionList(ArrayList<ArrayList<String>> vE)
 	{
 		ArrayList<ArrayList<String>>  exceptionList = vE;
@@ -1747,7 +2068,7 @@ private ReadPbwtResult PBWTAlgo(ArrayList<ReadStruct> readsList, Integer[] start
 			for(int i=0;i<str.size();i++)
 			{
 				rawText.append(str.get(i)+"|");
-			}
+			}	
 		}
 		String[] str = Huffman2.encodeText2(rawText.toString());
 		
@@ -2019,7 +2340,21 @@ private ReadPbwtResult PBWTAlgo(ArrayList<ReadStruct> readsList, Integer[] start
 				break;
 			}
 		}
-		System.out.println("The process has finished!");
+		System.out.println("The process of start is right!");
 	}
+	
+	private char[] getChars (byte[] bytes) {
+		Charset cs = Charset.forName ("UTF-8");
+		ByteBuffer bb = ByteBuffer.allocate (bytes.length);
+		bb.put (bytes);
+		bb.flip ();
+		CharBuffer cb = cs.decode (bb);
+		return cb.array();
+		}    
 
+	public static char byteToChar(byte[] b) 
+	{
+        char c = (char) (((b[0] & 0xFF) << 8) | (b[1] & 0xFF));
+        return c;
+    }
 }

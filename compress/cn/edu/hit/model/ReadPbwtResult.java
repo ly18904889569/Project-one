@@ -1,6 +1,7 @@
 package cn.edu.hit.model;
 
 import java.util.ArrayList;
+import java.util.List;
 
 public class ReadPbwtResult
 {
@@ -11,6 +12,44 @@ public class ReadPbwtResult
 	private ArrayList<ArrayList<String>> listsExcep;
 	
 	private ArrayList<ArrayList<Character>> listExQual;
+	
+	private List<String> listsExcep2;
+	
+	private ArrayList<Character> listExQual2;
+	
+	
+	
+	public ArrayList<Character> getListExQual2()
+	{
+		return listExQual2;
+	}
+
+	public void setListExQual2(ArrayList<Character> listExQual2)
+	{
+		this.listExQual2 = listExQual2;
+	}
+
+	public List<String> getListsExcep2()
+	{
+		return listsExcep2;
+	}
+
+	public void setListsExcep2(List<String> listsExcep2)
+	{
+		this.listsExcep2 = listsExcep2;
+	}
+
+	private int[] startPos;
+
+	public int[] getStartPos()
+	{
+		return startPos;
+	}
+
+	public void setStartPos(int[] is)
+	{
+		this.startPos = is;
+	}
 
 	public ArrayList<ArrayList<Integer>> getListsPBWT()
 	{
