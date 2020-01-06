@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 import java.util.PrimitiveIterator.OfDouble;
@@ -46,11 +47,15 @@ public class MainEncoding2
 	
 	static ArrayList<String> exBackUp = new ArrayList<String>();
 	
+	static int exListLength = 0;
+	
+	static int readsQualLength = 0;
+	
 	public static void main(String[] args)
 	{
 		MainEncoding2 encoding = new MainEncoding2();
 		
-		Test1 testOne = new Test1(2);
+		Test1 testOne = new Test1(4);
 						
 		CompressResult CompressRes = encoding.EncodePbwt(testOne);
 		
@@ -69,13 +74,26 @@ public class MainEncoding2
 	public static void ProcessIsTrue(Test1 testOne, ReadPbwtResult reCompressRes)
 	{
 		int[] deS = reCompressRes.getStartPos();
-		isTrue(testOne.readStart, deS);
+		deStartIsTrue(testOne.readStart, deS);
 		
 		ArrayList<ArrayList<Integer>> rePbwtList = reCompressRes.getListsPBWT();
 		PbwtIsTrue(testOne.getListsPBWT(),rePbwtList);
 		
 		List<String> dexBy = reCompressRes.getListsExcep2();
 		dexIsTrue2(exBackUp, dexBy);
+		
+		System.out.println("readsQual:");
+		for(int i=0; i<reCompressRes.getListsQual().size(); i++)
+		{
+			System.out.print(reCompressRes.getListsQual().get(i)+" ");
+		}
+		
+		System.out.println("\n"+"exQual");
+		for(int j=0; j<reCompressRes.getListExQual2().size(); j++)
+		{
+			System.out.print(reCompressRes.getListExQual2().get(j)+" ");
+		}
+		System.out.println("\n" + "reCompressExLength " + reCompressRes.getListExQual2().size() +" \t" + "reCompressQualLength: " + reCompressRes.getListsQual().size());
 				
 	}
 
@@ -370,17 +388,17 @@ public class MainEncoding2
 		{
 			for(int i=0; i<exQual.length; i+=3)
 			{
-				deStr[0] = (char)((byte) ((((exQual[i]+128)&0xff) >> 5)%8) + 48);
+				deStr[0] = (char)((byte) (((exQual[i]&0xff) >> 5)%8) + 48);
 				dexQual2.add(TranforOr(deStr[0]));
 				deStr[1] = (char)((byte) (((exQual[i]&0xff) >> 2)%8) + 48);
 				dexQual2.add(TranforOr(deStr[1]));
-				deStr[2] = (char)((byte) ((((exQual[i]&0xff)%4)*2)+((((exQual[i+1]+128)&0xff) >> 7)%2)) + 48);
+				deStr[2] = (char)((byte) ((((exQual[i]&0xff)%4)*2)+(((exQual[i+1]&0xff) >> 7)%2)) + 48);
 				dexQual2.add(TranforOr(deStr[2]));
 				deStr[3] = (char)((byte) (((exQual[i+1]&0xff) >> 4)%8) + 48);
 				dexQual2.add(TranforOr(deStr[3]));
 				deStr[4] = (char)((byte) (((exQual[i+1]&0xff) >> 1)%8) + 48);
 				dexQual2.add(TranforOr(deStr[4]));
-				deStr[5] = (char)((byte) ((((exQual[i+1]&0xff)%2)*4)+((((exQual[i+2]+128)&0xff) >> 6)%4)) + 48);
+				deStr[5] = (char)((byte) ((((exQual[i+1]&0xff)%2)*4)+(((exQual[i+2]&0xff) >> 6)%4)) + 48);
 				dexQual2.add(TranforOr(deStr[5]));
 				deStr[6] = (char)((byte) (((exQual[i+2]&0xff) >> 3)%8) + 48);
 				dexQual2.add(TranforOr(deStr[6]));
@@ -395,17 +413,17 @@ public class MainEncoding2
 			// 需要在循环终止条件上减去3，因为最后一个不一定正合适
 			for(int i=0; i<exQual.length - 3; i+=3)
 			{
-				deStr[0] = (char)((byte) ((((exQual[i]+128)&0xff) >> 5)%8) + 48);
+				deStr[0] = (char)((byte) (((exQual[i]&0xff) >> 5)%8) + 48);
 				dexQual2.add(TranforOr(deStr[0]));
 				deStr[1] = (char)((byte) (((exQual[i]&0xff) >> 2)%8) + 48);
 				dexQual2.add(TranforOr(deStr[1]));
-				deStr[2] = (char)((byte) ((((exQual[i]&0xff)%4)*2)+((((exQual[i+1]+128)&0xff) >> 7)%2)) + 48);
+				deStr[2] = (char)((byte) ((((exQual[i]&0xff)%4)*2)+(((exQual[i+1]&0xff) >> 7)%2)) + 48);
 				dexQual2.add(TranforOr(deStr[2]));
 				deStr[3] = (char)((byte) (((exQual[i+1]&0xff) >> 4)%8) + 48);
 				dexQual2.add(TranforOr(deStr[3]));
 				deStr[4] = (char)((byte) (((exQual[i+1]&0xff) >> 1)%8) + 48);
 				dexQual2.add(TranforOr(deStr[4]));
-				deStr[5] = (char)((byte) ((((exQual[i+1]&0xff)%2)*4)+((((exQual[i+2]+128)&0xff) >> 6)%4)) + 48);
+				deStr[5] = (char)((byte) ((((exQual[i+1]&0xff)%2)*4)+(((exQual[i+2]&0xff) >> 6)%4)) + 48);
 				dexQual2.add(TranforOr(deStr[5]));
 				deStr[6] = (char)((byte) (((exQual[i+2]&0xff) >> 3)%8) + 48);
 				dexQual2.add(TranforOr(deStr[6]));
@@ -417,7 +435,7 @@ public class MainEncoding2
 			// 多出一个字节的情况，策略就是全部还原，可能会多出来几个，但是最后拼接的时候就没了
 			if (exQual.length%3 ==1)
 			{
-				deStr2[0] = (char)((byte) ((((exQual[exQual.length-1]+128)&0xff) >> 5)%8)+48);
+				deStr2[0] = (char)((byte) (((exQual[exQual.length-1]&0xff) >> 5)%8)+48);
 				deStr2[1] = (char)((byte) (((exQual[exQual.length-1]&0xff) >> 2)%8)+48);
 				dexQual2.add(TranforOr(deStr2[0]));
 				dexQual2.add(TranforOr(deStr2[1]));
@@ -425,11 +443,11 @@ public class MainEncoding2
 			// 多出两个字节的情况，全部还原
 			if (exQual.length%3 ==2)
 			{
-				deStr3[0] = (char)((byte) ((((exQual[exQual.length-2]+128)&0xff) >> 5)%8)+48);
+				deStr3[0] = (char)((byte) (((exQual[exQual.length-2]&0xff) >> 5)%8)+48);
 				dexQual2.add(TranforOr(deStr3[0]));
 				deStr3[1] = (char)((byte) (((exQual[exQual.length-2]&0xff) >> 2)%8)+48);
 				dexQual2.add(TranforOr(deStr3[1]));
-				deStr3[2] = (char)((byte) ((((exQual[exQual.length-2]&0xff)%4)*2)+((((exQual[exQual.length-1]+128)&0xff) >> 7)%2))+48);
+				deStr3[2] = (char)((byte) ((((exQual[exQual.length-2]&0xff)%4)*2)+(((exQual[exQual.length-1]&0xff) >> 7)%2))+48);
 				dexQual2.add(TranforOr(deStr3[2]));
 				deStr3[3] = (char)((byte) (((exQual[exQual.length-1]&0xff) >> 4)%8)+48);
 				dexQual2.add(TranforOr(deStr3[3]));
@@ -653,7 +671,8 @@ public class MainEncoding2
 		{
 			start[i] = testOne.readStart[i];
 			end[i] = testOne.readEnd[i];
-			System.out.println(testOne.getListsPBWT().get(i).toString());
+			PrintReads1(start[i],testOne.getListsPBWT().get(i));
+//			System.out.println(testOne.getListsPBWT().get(i).toString());
 		}
 //		在这里进行start的压缩，有什么用啊，把start信息在存放一遍，testOne中就有这个信息，需要在来一次吗
 		byte[] startPos = compressStartPos(testOne.readStart);
@@ -761,6 +780,23 @@ public class MainEncoding2
 		allRes.setReadsResult(keyAndValue);
 		
 		return allRes;
+	}
+
+	private void PrintReads1(Integer integer, ArrayList<Integer> arrayList)
+	{
+		for(int i=1; i<integer+arrayList.size(); i++)
+		{
+			if(i<integer)
+			{
+				System.out.print("  ");
+			}
+			else
+			{
+				System.out.print(arrayList.get(i-integer)+" ");
+			}
+		}
+		System.out.println();
+		
 	}
 
 	private byte[] binaryKeys(List<Integer> keys)
@@ -1102,6 +1138,9 @@ private static ArrayList<ArrayList<Integer>> PBWTAlgoRe(ArrayList<ArrayList<Inte
 	// exceptionList 的唯一index
 	int exceptionIndex = 0;
 	int endIndex = 0;
+	int pre = 0;	// 索引空间大小
+	int cur = 0;	// currentlist当前被删除元素之前序列数量
+	LinkedList<Integer> posIndex = new LinkedList<Integer>();	// 位置索引表，表示插入到输出list中位置
 //	比对完之后从左往右
 	for (int col = 0; col < pbwtResult.size(); col++)
 	{
@@ -1184,7 +1223,7 @@ private static ArrayList<ArrayList<Integer>> PBWTAlgoRe(ArrayList<ArrayList<Inte
 			readsCurrListTemp.get(m).add(f[m]);
 //			qualReadsCurrListTemp.get(m).add(qualF[m]);
 		}
-		
+//		这里是将要删除的索引位置加入到removeIndeRe中，这个位置是currentlist中的位置
 		if (removeFlag) 
 		{
 			for (int i = 0; i < readsCurrListTemp.size(); i++) {
@@ -1194,12 +1233,44 @@ private static ArrayList<ArrayList<Integer>> PBWTAlgoRe(ArrayList<ArrayList<Inte
 				}
 			}
 		}
-		
-		int offset = 0;
+//		这里是需要修改的地方
+		int offset = 0;	// 因为有偏移，所以需要offset
 		for (Integer ins : removeIndexRe) 
 		{
-			readsResult.add(readsCurrListTemp.get(ins - offset));
-			readsCurrListTemp.remove(ins - offset);
+			pre = posIndex.size();
+			cur = ins- offset;
+			if(pre == cur)
+			{
+//				加在末尾
+				readsResult.add(readsCurrListTemp.get(ins - offset));
+				System.out.println(readsCurrListTemp.get(ins - offset));
+				readsCurrListTemp.remove(ins - offset);
+			}
+			else if (pre < cur) 
+			{
+//				在末尾加上站位符号，并将删除的序列加入到最后
+				for(int i=0;i <(cur-pre); i++)
+				{
+					ArrayList<Integer> empty = new ArrayList<Integer>();
+					readsResult.add(empty);
+					posIndex.add(readsResult.size()-1);
+				}
+				readsResult.add(readsCurrListTemp.get(ins - offset));
+				System.out.println(readsCurrListTemp.get(ins - offset));
+				readsCurrListTemp.remove(ins - offset);
+			}
+//			此时表明之前没有出去的序列要出去
+			else
+			{
+				int pos = posIndex.get(cur);
+				posIndex.remove(cur);
+				readsResult.set(pos,readsCurrListTemp.get(ins - offset));
+				System.out.println(readsCurrListTemp.get(ins - offset));
+				readsCurrListTemp.remove(ins - offset);
+			}
+//			readsResult.add(readsCurrListTemp.get(ins - offset));
+//			System.out.println(readsCurrListTemp.get(ins - offset));
+//			readsCurrListTemp.remove(ins - offset);
 //			exceptionResult.add(exceptionResultTemp.get(ins - offset));
 //			exceptionResultTemp.remove(ins - offset);
 			// startAlignment 和 endAlignment都处理一下
@@ -1317,6 +1388,7 @@ private ReadPbwtResult PBWTAlgo(ArrayList<ReadStruct> readsList, Integer[] start
 					if (curVal == 0)
 					{
 						qualA.add(curValQual);
+						readsQualLength++;
 					}
 					else
 					{
@@ -1325,6 +1397,7 @@ private ReadPbwtResult PBWTAlgo(ArrayList<ReadStruct> readsList, Integer[] start
 						readsCurrList.get(i).getException().remove(0);
 //						qualB.add(curValQual);
 						exceptionQual.add(curValQual);
+						exListLength++;
 					}
 					c.add(curVal);
 //					qualC.add(curValQual);
@@ -1346,6 +1419,7 @@ private ReadPbwtResult PBWTAlgo(ArrayList<ReadStruct> readsList, Integer[] start
 						else if (curVal == 0)
 						{
 							qualA.add(curValQual);
+							readsQualLength++;
 						}
 						else
 						{
@@ -1355,6 +1429,7 @@ private ReadPbwtResult PBWTAlgo(ArrayList<ReadStruct> readsList, Integer[] start
 							readsCurrList.get(i).getException().remove(0);
 //							qualB.add(curValQual);
 							exceptionQual.add(curValQual);
+							exListLength++;
 							
 						}
 						a.add(curVal);	//crazy:这里注意一下当为结束符号3的时候同样也会加入到其中
@@ -1370,6 +1445,7 @@ private ReadPbwtResult PBWTAlgo(ArrayList<ReadStruct> readsList, Integer[] start
 						else if (curVal == 0)
 						{
 							qualA.add(curValQual);
+							readsQualLength++;
 						}
 						else
 						{
@@ -1379,6 +1455,7 @@ private ReadPbwtResult PBWTAlgo(ArrayList<ReadStruct> readsList, Integer[] start
 							readsCurrList.get(i).getException().remove(0);
 //							qualB.add(curValQual);
 							exceptionQual.add(curValQual);
+							exListLength++;
 						}
 						b.add(curVal);
 //						qualB.add(curValQual);
@@ -1804,12 +1881,13 @@ private ReadPbwtResult PBWTAlgo(ArrayList<ReadStruct> readsList, Integer[] start
 		ArrayList<ArrayList<Integer>> exceptionQualProc = new ArrayList<ArrayList<Integer>>();
 		ArrayList<Integer> keys = new ArrayList<Integer>();
 		
-		for(ArrayList<Character> qualList : exceptionQual){
+		for(ArrayList<Character> qualList : exceptionQual)
+		{
 			ArrayList<Integer> qualProc = new ArrayList<Integer>();
 			if (qualList.isEmpty())
 			{
 				qualProc.add(0);
-				keys.add(0);
+//				keys.add(0);
 			}
 			else
 			{
@@ -1888,9 +1966,9 @@ private ReadPbwtResult PBWTAlgo(ArrayList<ReadStruct> readsList, Integer[] start
 			eQual2 = ByteBuffer.allocate(keys.size()/8 * 3);
 			for( ; left < keys.size(); left+=8)
 			{
-				byte by1 = (byte)(keys.get(left)*32 + keys.get(left+1)*4 + keys.get(left+2)/2 -128);
-				byte by2 = (byte)(keys.get(left+2)%2 * 128 + keys.get(left+3)* 16 + keys.get(left+4)*2 + keys.get(left+5)/4 - 128);
-				byte by3 = (byte)(keys.get(left+5)%4 * 64 + keys.get(left+6)*8 + keys.get(left+7)-128 );
+				byte by1 = (byte)(keys.get(left)*32 + keys.get(left+1)*4 + keys.get(left+2)/2);
+				byte by2 = (byte)(keys.get(left+2)%2 * 128 + keys.get(left+3)* 16 + keys.get(left+4)*2 + keys.get(left+5)/4 );
+				byte by3 = (byte)(keys.get(left+5)%4 * 64 + keys.get(left+6)*8 + keys.get(left+7) );
 				eQual2.put(by1);
 				eQual2.put(by2);
 				eQual2.put(by3); 
@@ -1902,9 +1980,9 @@ private ReadPbwtResult PBWTAlgo(ArrayList<ReadStruct> readsList, Integer[] start
 			eQual2 = ByteBuffer.allocate(keys.size()/8 * 3 + 3);
 			for( ; left < keys.size()-8; left+=8)
 			{
-				byte by1 = (byte)(keys.get(left)*32 + keys.get(left+1)*4 + keys.get(left+2)/2 -128);
-				byte by2 = (byte)(keys.get(left+2)%2 * 128 + keys.get(left+3)* 16 + keys.get(left+4)*2 + keys.get(left+5)/4 - 128);
-				byte by3 = (byte)(keys.get(left+5)%4 * 64 + keys.get(left+6)*8 + keys.get(left+7)-128 );
+				byte by1 = (byte)(keys.get(left)*32 + keys.get(left+1)*4 + keys.get(left+2)/2);
+				byte by2 = (byte)(keys.get(left+2)%2 * 128 + keys.get(left+3)* 16 + keys.get(left+4)*2 + keys.get(left+5)/4);
+				byte by3 = (byte)(keys.get(left+5)%4 * 64 + keys.get(left+6)*8 + keys.get(left+7));
 				eQual2.put(by1);
 				eQual2.put(by2);
 				eQual2.put(by3); 
@@ -1916,43 +1994,43 @@ private ReadPbwtResult PBWTAlgo(ArrayList<ReadStruct> readsList, Integer[] start
 			switch (j)
 			{
 			case 1:
-				lastby = (byte)(keys.get(left)*32 - 128);
+				lastby = (byte)(keys.get(left)*32);
 				eQual2.put(lastby);
 				break;
 			case 2:
-				lastby = (byte)(keys.get(left)*32 + keys.get(left+1)*4 - 128);
+				lastby = (byte)(keys.get(left)*32 + keys.get(left+1)*4);
 				eQual2.put(lastby);
 				break;
 			case 3:
-				lastby = (byte)(keys.get(left)*32 + keys.get(left+1)*4 + keys.get(left+2)/2 -128);
-				lastby2 = (byte)(keys.get(left+2)%2 * 128 - 128);
+				lastby = (byte)(keys.get(left)*32 + keys.get(left+1)*4 + keys.get(left+2)/2);
+				lastby2 = (byte)(keys.get(left+2)%2 * 128);
 				eQual2.put(lastby);
 				eQual2.put(lastby2);
 				break;
 			case 4:
-				lastby = (byte)(keys.get(left)*32 + keys.get(left+1)*4 + keys.get(left+2)/2 -128);
-				lastby2 = (byte)(keys.get(left+2)%2 * 128 + keys.get(left+3)* 16 - 128);
+				lastby = (byte)(keys.get(left)*32 + keys.get(left+1)*4 + keys.get(left+2)/2);
+				lastby2 = (byte)(keys.get(left+2)%2 * 128 + keys.get(left+3)* 16);
 				eQual2.put(lastby);
 				eQual2.put(lastby2);
 				break;
 			case 5:
-				lastby = (byte)(keys.get(left)*32 + keys.get(left+1)*4 + keys.get(left+2)/2 -128);
-				lastby2 = (byte)(keys.get(left+2)%2 * 128 + keys.get(left+3)* 16 + keys.get(left+4)*2 - 128);
+				lastby = (byte)(keys.get(left)*32 + keys.get(left+1)*4 + keys.get(left+2)/2);
+				lastby2 = (byte)(keys.get(left+2)%2 * 128 + keys.get(left+3)* 16 + keys.get(left+4)*2);
 				eQual2.put(lastby);
 				eQual2.put(lastby2);
 				break;
 			case 6:
-				lastby = (byte)(keys.get(left)*32 + keys.get(left+1)*4 + keys.get(left+2)/2 -128);
-				lastby2 = (byte)(keys.get(left+2)%2 * 128 + keys.get(left+3)* 16 + keys.get(left+4)*2 + keys.get(left+5)/4 - 128);
-				lastby3 = (byte)(keys.get(left+5)%4 * 64 -128 );
+				lastby = (byte)(keys.get(left)*32 + keys.get(left+1)*4 + keys.get(left+2)/2);
+				lastby2 = (byte)(keys.get(left+2)%2 * 128 + keys.get(left+3)* 16 + keys.get(left+4)*2 + keys.get(left+5)/4);
+				lastby3 = (byte)(keys.get(left+5)%4 * 64);
 				eQual2.put(lastby);
 				eQual2.put(lastby2);
 				eQual2.put(lastby3);
 				break;
 			case 7:
-				lastby = (byte)(keys.get(left)*32 + keys.get(left+1)*4 + keys.get(left+2)/2 -128);
-				lastby2 = (byte)(keys.get(left+2)%2 * 128 + keys.get(left+3)* 16 + keys.get(left+4)*2 + keys.get(left+5)/4 - 128);
-				lastby3 = (byte)(keys.get(left+5)%4 * 64 + keys.get(left+6)*8 - 128 );
+				lastby = (byte)(keys.get(left)*32 + keys.get(left+1)*4 + keys.get(left+2)/2);
+				lastby2 = (byte)(keys.get(left+2)%2 * 128 + keys.get(left+3)* 16 + keys.get(left+4)*2 + keys.get(left+5)/4);
+				lastby3 = (byte)(keys.get(left+5)%4 * 64 + keys.get(left+6)*8);
 				eQual2.put(lastby);
 				eQual2.put(lastby2);
 				eQual2.put(lastby3);
@@ -2160,11 +2238,11 @@ private ReadPbwtResult PBWTAlgo(ArrayList<ReadStruct> readsList, Integer[] start
 		char temp;	
 		if (ch == '1')
 		{
-			temp = Character.valueOf((char) (33 + random.nextInt(10)));
+			temp = Character.valueOf((char) (34 + random.nextInt(10)));
 		}
 		else if (ch == '2') 
 		{
-			temp = Character.valueOf((char) (43 + random.nextInt(10)));
+			temp = Character.valueOf((char) (44 + random.nextInt(10)));
 		}
 		else if (ch == '3')
 		{
@@ -2188,7 +2266,7 @@ private ReadPbwtResult PBWTAlgo(ArrayList<ReadStruct> readsList, Integer[] start
 		}
 		else 
 		{
-			temp = Character.valueOf((char) 0);
+			temp = '!';
 	// 包含0和4的情况，0不用说了不会出现，4是压缩过程中故意舍掉的具体为啥不知道
 		}
 		return temp;
@@ -2329,7 +2407,7 @@ private ReadPbwtResult PBWTAlgo(ArrayList<ReadStruct> readsList, Integer[] start
 		System.out.println();
 	}
 	
-	private static void isTrue(int[] start, int[] deS)
+	private static void deStartIsTrue(int[] start, int[] deS)
 	{
 		System.out.println();
 		for(int i=0; i<deS.length&&i<start.length ;i++)
