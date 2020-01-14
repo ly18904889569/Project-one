@@ -11,6 +11,7 @@ import cn.edu.hit.model.ReadsHorizonModel;
 import cn.edu.hit.model.ReadsPreProcessResult;
 import cn.edu.hit.model.VerticalEncodeResult;
 import cn.edu.hit.test.ReadStruct;
+import cn.edu.hit.testdata.Test3;
 
 /**
  * 利用PBWT进行垂直编码
@@ -22,9 +23,19 @@ public class VerticalEncoding {
 
 	public static void main(String[] args) {
 		VerticalEncoding encoding = new VerticalEncoding();
-		encoding.init();
+//		encoding.init();
+		encoding.iniTest();
 	}
 	
+	private void iniTest()
+	{
+//		前面的预处理就不要了，我们所做的就是构造一些假的数据
+//		直接用函数pbwt略过其他所有的步骤。只要把之前的test数据形式改成符合readlist数据readstruct结构就行
+		ReadsPreProcessResult reads = new ReadsPreProcessResult();
+		Test3 testdata = new Test3(1);
+		
+	}
+
 	public void init(){
 		ReadPreProcess readPreProcess = new ReadPreProcess();
 //		String filePath = "/home/rivers/riversdoc/test.sorted.bam";

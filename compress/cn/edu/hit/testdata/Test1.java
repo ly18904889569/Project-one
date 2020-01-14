@@ -384,7 +384,7 @@ public class Test1
 	 * 生成异常信息，长度从1-4
 	 * @return exception message
 	 */
-	private String randCreatex()
+	public static String randCreatex()
 	{
 		// 最简单的生成几个就行，异常情况为ATCGDN
 		String str="";
@@ -433,7 +433,7 @@ public class Test1
 		}
 		return str;
 	}
-	private String randCreatexQua()
+	public static String randCreatexQua()
 	{
 		return randCreateQua().toString();
 	}
@@ -442,7 +442,7 @@ public class Test1
 	 * 产生匹配上的质量分数
 	 * @return 字符ch
 	 */
-	private Character randCreateQua()
+	public static Character randCreateQua()
 	{
 		// 暂时简单化处理，随机生成的数字，之后在修改精细一下
 		Random rand = new Random();
