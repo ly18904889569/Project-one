@@ -9,13 +9,13 @@ import java.util.List;
 public class ReadStruct {
 	
 	//起始位置
-	int startAlignment;
+	private int startAlignment;
 	//已经处理过的Reads序列，这里仅0、1表示一下，方便处理
-	List<Integer> reads;
-	int endAlignment;
+	private List<Integer> reads;
+	private int endAlignment;
 	
 	//异常信息记录进来
-	List<String> exception;
+	private List<String> exception;
 	
 	//把质量数等信息也加入进来吧
 	private String readQuality;

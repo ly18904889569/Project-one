@@ -56,7 +56,7 @@ public class Huffman2 {
 		
 		decoded = "";
 		Node node = nodes.peek();
-		System.out.println("cncoded.length:\t"+encoded.length()+"\t" + encoded);
+//		System.out.println("cncoded.length:\t"+encoded.length()+"\t" + encoded);
 		for (int i = 0; i < encoded.length();) {
 			Node tmpNode = node;
 			while (tmpNode.left != null && tmpNode.right != null && i < encoded.length()) {
@@ -77,7 +77,7 @@ public class Huffman2 {
 				}
 
 		}
-		System.out.println("Decoded Text: " + decoded);
+//		System.out.println("Decoded Text: " + decoded);
 		return decoded;
 	}
 

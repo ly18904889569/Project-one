@@ -20,6 +20,8 @@ import cn.edu.hit.testdata.Test3;
  *
  */
 public class VerticalEncoding {
+	
+	static VerticalEncodeResult result = null;
 
 	public static void main(String[] args) {
 		VerticalEncoding encoding = new VerticalEncoding();
@@ -27,13 +29,23 @@ public class VerticalEncoding {
 		encoding.iniTest();
 	}
 	
-	private void iniTest()
+	public static void iniTest()
 	{
 //		前面的预处理就不要了，我们所做的就是构造一些假的数据
 //		直接用函数pbwt略过其他所有的步骤。只要把之前的test数据形式改成符合readlist数据readstruct结构就行
 		ReadsPreProcessResult reads = new ReadsPreProcessResult();
 		Test3 testdata = new Test3(1);
+		result = pbwtEncode2(testdata);
+	}
+/**
+ * 模拟数据的处理过程
+ * @param testdata
+ * @return
+ */
+	private static VerticalEncodeResult pbwtEncode2(Test3 testdata)
+	{
 		
+		return null;
 	}
 
 	public void init(){
@@ -52,7 +64,7 @@ public class VerticalEncoding {
 //		this.PrintResult();
 	}
 
-	static VerticalEncodeResult result = null;
+//	static VerticalEncodeResult result = null;
 	
 	// TODO 这里有一个疑惑,为何不改成Character,而是用String?貌似都是像Character一样在处理
 	// 写一个对异常信息的处理,这里先简易处理
@@ -102,6 +114,8 @@ public class VerticalEncoding {
 	public VerticalEncodeResult getVerticalEncodeREsult(){
 		VerticalEncoding encoding = new VerticalEncoding();
 		encoding.init();
+//		这里需要在iniTest中把result进行设置一下
+		VerticalEncoding.iniTest();
 		return this.result;
 	}
 	
@@ -143,6 +157,7 @@ public class VerticalEncoding {
 			struct.setException(reads.getReadsInfo().get(i).getExceptionInfo());	//liiyang:存储预处理后比对后的信息
 			struct.setReadQuality(reads.getReadsInfo().get(i).getReadQuality());
 			struct.setExceptionQuality(reads.getReadsInfo().get(i).getExceptionQuality());
+//			readsList就相当于我们之前设置的模拟数据，从这之后进行模拟
 			readsList.add(struct);
 		}
 

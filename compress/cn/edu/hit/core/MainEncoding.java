@@ -21,11 +21,11 @@ public class MainEncoding {
 		MainEncoding encoding = new MainEncoding();
 		VerticalEncoding vE = new VerticalEncoding();
 		// 异常信息列表，测试可以完整通过
-		byte[] exBy = encoding.EncodeExceptionList(vE);		//liyang:对于异常信息的处理是采用哈弗曼编码
-		
-		// 异常信息的质量分数，测试可以完整通过
-		byte[] exQual = encoding.EncodeExceptionQual(vE);		//liyang：对于异常值的处理
-		
+//		byte[] exBy = encoding.EncodeExceptionList(vE);		//liyang:对于异常信息的处理是采用哈弗曼编码
+//		
+//		// 异常信息的质量分数，测试可以完整通过
+//		byte[] exQual = encoding.EncodeExceptionQual(vE);		//liyang：对于异常值的处理
+//		
 		byte[] pbwtQual = encoding.EncodePbwtQual(vE);		//liyang:对于质量分数的处理
 		
 		// encodePBWT测试可以完整通过
@@ -43,11 +43,11 @@ public class MainEncoding {
 		String fileDestPbwt = "/home/yangli/Documents/compress/pbwt1";
 		try {
             Path path = Paths.get(fileDestEx);
-            Files.write(path, exBy);
-            path = Paths.get(fileDestExQual);
-            Files.write(path, exQual);
-            path = Paths.get(fileDestPbwtQual);
-            Files.write(path, pbwtQual);
+//            Files.write(path, exBy);
+//            path = Paths.get(fileDestExQual);
+//            Files.write(path, exQual);
+//            path = Paths.get(fileDestPbwtQual);
+//            Files.write(path, pbwtQual);
             path = Paths.get(fileDestPbwt);
 //            Path path = Paths.get(fileDestPbwt);
             Files.write(path, pbwt);
@@ -391,6 +391,7 @@ public class MainEncoding {
 	public byte[] EncodePbwt(VerticalEncoding vE){
 //		VerticalEncoding vE = new VerticalEncoding();
 		VerticalEncodeResult result = vE.getVerticalEncodeREsult();		
+//		获取listsPBWT的格式是对的，这个数据存储在result这个对象中
 		ArrayList<ArrayList<Integer>> listsPBWT = result.getListsPBWT();
 		System.out.println(listsPBWT.size());
 		

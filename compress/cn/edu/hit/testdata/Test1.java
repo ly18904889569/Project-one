@@ -13,15 +13,15 @@ import htsjdk.variant.variantcontext.writer.BCF2FieldEncoder.Flag;
 public class Test1
 {
 	// crazy:先取验证最简单的情况，等长对齐的情况
-	public ArrayList<ArrayList<String>> exceptionList = new ArrayList<ArrayList<String>>();
+	public ArrayList<ArrayList<String>> exceptionList; 
 	
-	public ArrayList<ArrayList<String>> exceptionListQual = new ArrayList<ArrayList<String>>();
+	public ArrayList<ArrayList<String>> exceptionListQual;
 	
-	public ArrayList<ArrayList<Character>> listsPbwtQual = new ArrayList<ArrayList<Character>>();
+	public ArrayList<ArrayList<Character>> listsPbwtQual;
 	
-	public ArrayList<ArrayList<Integer>> listsPBWT = new ArrayList<ArrayList<Integer>>();
+	public ArrayList<ArrayList<Integer>> listsPBWT;
 	
-	public ArrayList<ArrayList<Character>> readQual = new ArrayList<ArrayList<Character>>();
+	public ArrayList<ArrayList<Character>> readQual;
 	
 	public int readStart[];
 	
@@ -35,75 +35,85 @@ public class Test1
 //	List<List<Integer>> listsOri = new ArrayList<>();
 	public Test1()
 	{
-		int length = 8;	// read的长度
-		int Num = 8;		// read的数量
-		int[] start = new int[] { 1, 1, 1, 1, 1, 1, 1, 1};
-		int[] end = new int[] { 8, 8, 8, 8, 8, 8, 8, 8 };
-		Random rand = new Random();
-		for(int i = 0; i < Num; i++)
-		{
-			ArrayList<Integer> list = new ArrayList<Integer>();
-			ArrayList<Character> qualist = new ArrayList<Character>();
-			ArrayList<Character> readQualist = new ArrayList<Character>();
-			ArrayList<String> exqualist = new ArrayList<String>();
-			ArrayList<String> exlist = new ArrayList<String>();
-			int flag=0;
-			
-//			list.add(ReadElemEnum.START.ordinal());	
-			for (int j = 0; j < length - 1 ; j++)
-			{
-				Character qua;
-				String exqua;
-				String exbase;
-				int base = rand.nextInt(2);
-				if (base == 1)
-				{
-					base = rand.nextInt(2);
-				}
-				list.add(base);
-				if(base == 0)
-				{
-					// 0的情况，不需要考虑异常质量分数，只需要随机生成正常质量分数就行
-					qua = randCreateQua();
-					qualist.add(qua);
-					readQualist.add(qua);
-				}
-				else
-				{
-					// 1的情况，不需要考虑正常质量分数，只需要生成异常值和异常质量分数就行
-					exqua = randCreatexQua();
-					exqualist.add(exqua);
-					readQualist.add(exqua.charAt(0));
-					exbase = randCreatex();
-					// 这里应该没有必要。
-					if (exbase.length()>0)
-					{
-						exlist.add(exbase);
-						flag = 1;
-					}	
-				}
-				
-			}
-			list.add(ReadElemEnum.END.ordinal());
-//			listsOri.add(list);
-			listsPBWT.add(list);
-			listsPbwtQual.add(qualist);
-			readQual.add(readQualist);
-//			exceptionListQual.add(exqualist);
-			// 这里的问题就是，如果是全是0的情况下，reads记录缺少异常质量分数和异常值的信息
-			if (flag ==1)
-			{
-				exceptionList.add(exlist);
-				exceptionListQual.add(exqualist);
-			}
-		}
-		
-		readStart = start;
-		readEnd = end;
+		exceptionList = new ArrayList<ArrayList<String>>();
+		exceptionListQual = new ArrayList<ArrayList<String>>();
+		listsPbwtQual = new ArrayList<ArrayList<Character>>();
+		listsPBWT = new ArrayList<ArrayList<Integer>>();
+		readQual = new ArrayList<ArrayList<Character>>();
+//		int length = 8;	// read的长度
+//		int Num = 8;		// read的数量
+//		int[] start = new int[] { 1, 1, 1, 1, 1, 1, 1, 1};
+//		int[] end = new int[] { 8, 8, 8, 8, 8, 8, 8, 8 };
+//		Random rand = new Random();
+//		for(int i = 0; i < Num; i++)
+//		{
+//			ArrayList<Integer> list = new ArrayList<Integer>();
+//			ArrayList<Character> qualist = new ArrayList<Character>();
+//			ArrayList<Character> readQualist = new ArrayList<Character>();
+//			ArrayList<String> exqualist = new ArrayList<String>();
+//			ArrayList<String> exlist = new ArrayList<String>();
+//			int flag=0;
+//			
+////			list.add(ReadElemEnum.START.ordinal());	
+//			for (int j = 0; j < length - 1 ; j++)
+//			{
+//				Character qua;
+//				String exqua;
+//				String exbase;
+//				int base = rand.nextInt(2);
+//				if (base == 1)
+//				{
+//					base = rand.nextInt(2);
+//				}
+//				list.add(base);
+//				if(base == 0)
+//				{
+//					// 0的情况，不需要考虑异常质量分数，只需要随机生成正常质量分数就行
+//					qua = randCreateQua();
+//					qualist.add(qua);
+//					readQualist.add(qua);
+//				}
+//				else
+//				{
+//					// 1的情况，不需要考虑正常质量分数，只需要生成异常值和异常质量分数就行
+//					exqua = randCreatexQua();
+//					exqualist.add(exqua);
+//					readQualist.add(exqua.charAt(0));
+//					exbase = randCreatex();
+//					// 这里应该没有必要。
+//					if (exbase.length()>0)
+//					{
+//						exlist.add(exbase);
+//						flag = 1;
+//					}	
+//				}
+//				
+//			}
+//			list.add(ReadElemEnum.END.ordinal());
+////			listsOri.add(list);
+//			listsPBWT.add(list);
+//			listsPbwtQual.add(qualist);
+//			readQual.add(readQualist);
+////			exceptionListQual.add(exqualist);
+//			// 这里的问题就是，如果是全是0的情况下，reads记录缺少异常质量分数和异常值的信息
+//			if (flag ==1)
+//			{
+//				exceptionList.add(exlist);
+//				exceptionListQual.add(exqualist);
+//			}
+//		}
+//		
+//		readStart = start;
+//		readEnd = end;
 	}
 	
 	public Test1(int num)
 	{
+		exceptionList = new ArrayList<ArrayList<String>>();
+		exceptionListQual = new ArrayList<ArrayList<String>>();
+		listsPbwtQual = new ArrayList<ArrayList<Character>>();
+		listsPBWT = new ArrayList<ArrayList<Integer>>();
+		readQual = new ArrayList<ArrayList<Character>>();
 		int start[];
 		int end[];
 		int length;
