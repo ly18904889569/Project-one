@@ -52,7 +52,7 @@ public class Huffman2 {
 		return false;
 	}
 
-	public  static String decodeText(String encoded) {
+	public static String decodeText(String encoded) {
 		
 		decoded = "";
 		Node node = nodes.peek();
@@ -81,6 +81,70 @@ public class Huffman2 {
 		return decoded;
 	}
 
+	public static String decodeText(StringBuffer encoded)
+	{
+		decoded = "";
+		Node node = nodes.peek();
+		// System.out.println("cncoded.length:\t"+encoded.length()+"\t" + encoded);
+		for (int i = 0; i < encoded.length();)
+		{
+			Node tmpNode = node;
+			while (tmpNode.left != null && tmpNode.right != null && i < encoded.length())
+			{
+				if (encoded.charAt(i) == '1')
+					tmpNode = tmpNode.right;
+				else
+					tmpNode = tmpNode.left;
+				i++;
+			}
+
+			if (tmpNode != null)
+				if (tmpNode.character.length() == 1)
+				{
+					decoded += tmpNode.character;
+				} else
+				{
+					System.out.println("Input not Valid"); // 压缩后的序列反解回来出错
+					System.out.println(tmpNode.character);
+				}
+
+		}
+		// System.out.println("Decoded Text: " + decoded);
+		return decoded;
+	}
+	
+	public static StringBuffer decodeText2(StringBuffer encoded)
+	{
+		StringBuffer decoded2 = new StringBuffer();
+		Node node = nodes.peek();
+		// System.out.println("cncoded.length:\t"+encoded.length()+"\t" + encoded);
+		for (int i = 0; i < encoded.length();)
+		{
+			Node tmpNode = node;
+			while (tmpNode.left != null && tmpNode.right != null && i < encoded.length())
+			{
+				if (encoded.charAt(i) == '1')
+					tmpNode = tmpNode.right;
+				else
+					tmpNode = tmpNode.left;
+				i++;
+			}
+
+			if (tmpNode != null)
+				if (tmpNode.character.length() == 1)
+				{
+					decoded2.append(tmpNode.character);
+				} else
+				{
+					System.out.println("Input not Valid"); // 压缩后的序列反解回来出错
+					System.out.println(tmpNode.character);
+				}
+
+		}
+		// System.out.println("Decoded Text: " + decoded);
+		return decoded2;
+	}
+	
 	public static String encodeText(String rawText) {
 		for (int i = 0; i < rawText.length(); i++)
 		{

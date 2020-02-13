@@ -67,18 +67,41 @@ public class MainEncoding2
 		// reads 还需要经过一段处理，转化为Test1格式的数据
 		// Test1 testOne = new Test1(4);
 
+//		PrintInterval(reads);
+		
 		long lstart1 = System.currentTimeMillis();
 		CompressResult CompressRes = encoding.EncodePbwt(reads);
 		long lend1 = System.currentTimeMillis();
 		long time = (lend1 - lstart1);
-
+		// 解压缩
 		ReadPbwtResult reCompressRes = encoding.DeCodePbwt(CompressRes);
-
+		// 正确性验证
 		ProcessIsTrue(reads, reCompressRes);
 		System.out.println(time / 1000);
 		System.out.println("Using time：" + time / 1000 / 60 / 60 + " h:" + time / 1000 / 60 % 60 + " m:"
 				+ time / 1000 % 60 + " s");
 		System.out.println("********************End********************");
+	}
+/**
+ * 输出reads连续区域长度以及间隔长度
+ * @param reads
+ */
+	private static void PrintInterval(ReadsPreProcessResult reads)
+	{
+		System.out.println("×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×");
+		System.out.println("（horizon）start[0]："+reads.getReadsHorizon().get(0).getAlignmentStart());
+		System.out.println("（readsinfo）start[0]："+reads.getReadsInfo().get(0).getAlignmentStart());
+		System.out.println("（horizon）end[last]："+reads.getReadsHorizon().get(reads.getReadsHorizon().size()-1).getAlignmentEnd());
+		System.out.println("（readsinfo）end[last]："+reads.getReadsInfo().get(reads.getReadsInfo().size()-1).getAlignmentEnd());
+		
+		int start = 0;
+		int end = 0;
+		int Sumdistance = 0;
+		int Suminterval = 0;
+//		for(int i =0; i<reads.getReadsHorizon().size()-1;i++)
+//		{
+//			if(reads.getReadsHorizon().get(i+1).getAlignmentStart())
+//		}
 	}
 
 	/**
@@ -556,18 +579,19 @@ public class MainEncoding2
 	{
 		int lengthExOne = exBackUp2.size();
 		int lengthExTwo = dexBy.size();
-		if (lengthExOne != lengthExTwo)
-		{
-			System.out.println("########### The process of exList is Wrong（1） #############");
-			return false;
-		} else
+//		if (lengthExOne != lengthExTwo)
+//		{
+//			System.out.println("########### The process of exList is Wrong（1） #############");
+////			return false;
+//		} else
 		{
 			for (int i = 0; i < lengthExTwo; i++)
 			{
 				if (!exBackUp.get(i).equals(dexBy.get(i)))
 				{
 					System.out.println("########### The process of exList is Wrong（2) #############"+i+" ");
-					return false;
+					System.out.println("origin:"+exBackUp2.get(i)+"\t decompress:"+dexBy.get(i));
+//					return false;
 				}
 			}
 		}
@@ -666,17 +690,21 @@ public class MainEncoding2
 	public static String[] deEncodeExceptionList(byte[] array)
 	{
 		// 实现解压缩
+		ArrayList<String> dexRes = new ArrayList<String>();
 		String byte2EncodeResult = "";
+		StringBuffer byte2EncodeResult2 = new StringBuffer();
 		String tempbyte2 = "";
 		int num = 0;
 		for (int i = 0; i < array.length - 2; i++)
 		{
-			if (array[i] == ' ')
-			{
-				break;
-			}
-			tempbyte2 = String.format("%8s", Integer.toBinaryString(array[i] & 0xFF)).replace(' ', '0');
-
+//			if (array[i] == ' ')
+//			{
+//				System.out.println("i of ex \t"+i);
+//				break;
+//			}
+//			tempbyte2 = String.format("%8s", Integer.toBinaryString(array[i] & 0xFF)).replace(' ', '0');
+			tempbyte2 = String.format("%8s", Integer.toBinaryString(array[i] & 0xFF));
+			
 			num++;
 //			if (num % 2 == 1)
 //			{
@@ -685,19 +713,21 @@ public class MainEncoding2
 //			{
 //				System.out.println(tempbyte2);
 //			}
-			byte2EncodeResult += tempbyte2;
+//			byte2EncodeResult += tempbyte2;
+			byte2EncodeResult2.append(tempbyte2);
 		}
 		// System.out.println();
 		// System.out.println("num : "+num);
 		// 针对最后一进行处理
-		String strTail = String.format("%8s", Integer.toBinaryString(array[array.length - 2] & 0xFF)).replace(' ', '0')
-				+ String.format("%8s", Integer.toBinaryString(array[array.length - 1] & 0xFF)).replace(' ', '0');
-		System.out.println(strTail);
+		String strTail = String.format("%8s", Integer.toBinaryString(array[array.length - 2] & 0xFF))
+				+ String.format("%8s", Integer.toBinaryString(array[array.length - 1] & 0xFF));
+		System.out.println("strTail:"+strTail);
 		// 这个地方问题严重，暂时不知道如何解决,这句话有什么用啊，
 		// String[] res = strTail.split("000111");
 		// byte2EncodeResult += res[0];
 		// System.out.println("res[0]: "+res[0]);
-		byte2EncodeResult += strTail;
+//		byte2EncodeResult += strTail;
+		byte2EncodeResult2.append(strTail);
 
 		// decoding Text
 		// 这部分需要优化一下，首先需要通过样本计算出每个碱基出现的概率，从而建立一个正确的huffman树，齐次解压缩和压缩只需要建立一次树就行。
@@ -705,17 +735,81 @@ public class MainEncoding2
 		String rateText = "AAACCCTTTGGG||DN";
 		huffman.handleRate(rateText);
 
-		String decodedResult = huffman.decodeText(byte2EncodeResult);
-		String decodeResult2 = decodedResult.substring(0, decodedResult.lastIndexOf("|"));
+//		String decodedResult = huffman.decodeText(byte2EncodeResult);
+		StringBuffer decodedRes = huffman.decodeText2(byte2EncodeResult2);
+		String decodeRes2 = decodedRes.substring(0, decodedRes.lastIndexOf("|")) + '|';
+		System.out.println(decodeRes2.charAt(decodeRes2.length()-1));
+//		String decodeResult2 = decodedResult.substring(0, decodedResult.lastIndexOf("|"));
 
 		// System.out.println(decodeResult2);
 
-		String[] dexResult = decodeResult2.split("\\|");
+//		String[] dexResult = decodeResult2.split("\\|");
+		String[] dexResult = decodeRes2.split("\\|");
+//		char tempChar;
+//		for(int i=0; i<decodeRes2.length();i++)
+//		{
+//			StringBuffer tempStr = new StringBuffer();
+//			tempChar = decodeRes2.charAt(i);
+//			if(tempChar != '|')
+//			{
+//				tempStr.append(tempChar);
+//			}
+//			else
+//			{
+//				dexRes.add(tempStr.toString());
+//			}
+//		}
 		// System.out.print(decodedResult.replace("|", "\n"));
-
+		System.out.println("testing the speed");
 		return dexResult;
 	}
 
+	public static ArrayList<String> deEncodeException(byte[] array)
+	{
+		// 实现解压缩
+		ArrayList<String> dexRes = new ArrayList<String>();
+		String byte2EncodeResult = "";
+		StringBuffer byte2EncodeResult2 = new StringBuffer();
+		String tempbyte2 = "";
+		for (int i = 0; i < array.length - 2; i++)
+		{
+			tempbyte2 = String.format("%8s", Integer.toBinaryString(array[i] & 0xFF));
+			byte2EncodeResult2.append(tempbyte2);
+		}
+
+		// 针对最后一进行处理
+		String strTail = String.format("%8s", Integer.toBinaryString(array[array.length - 2] & 0xFF))
+				+ String.format("%8s", Integer.toBinaryString(array[array.length - 1] & 0xFF));
+		System.out.println("strTail:"+strTail);
+		byte2EncodeResult2.append(strTail);
+
+		// decoding Text
+		// 这部分需要优化一下，首先需要通过样本计算出每个碱基出现的概率，从而建立一个正确的huffman树，齐次解压缩和压缩只需要建立一次树就行。
+		Huffman2 huffman = new Huffman2();
+		String rateText = "AAACCCTTTGGG||DN";
+		huffman.handleRate(rateText);
+
+		StringBuffer decodedRes = huffman.decodeText2(byte2EncodeResult2);
+		String decodeRes2 = decodedRes.substring(0, decodedRes.lastIndexOf("|")) + '|';
+		char tempChar;
+		for(int i=0; i<decodeRes2.length();i++)
+		{
+			StringBuffer tempStr = new StringBuffer();
+			tempChar = decodeRes2.charAt(i);
+			if(tempChar != '|')
+			{
+				tempStr.append(tempChar);
+			}
+			else
+			{
+				dexRes.add(tempStr.toString());
+			}
+		}
+		// System.out.print(decodedResult.replace("|", "\n"));
+		System.out.println("testing the speed");
+		return dexRes;
+	}
+	
 	// 传入的vE是一个0,1序列。第一步进行动态pbwt变化，第二部进行游程编码
 	// 我们在进行reads编码的过程中同时也需要编码序列的起始位置（长度先看一下）
 	// 我需要在这里重新写一下pbwt变化
@@ -868,7 +962,7 @@ public class MainEncoding2
 			end[i] = reads.getReadsHorizon().get(i).getAlignmentEnd();
 			// System.out.println(start[i]+"\t" + end[i]);
 		}
-		System.out.println("The difference is："+(end[end.length-1]-start[0]));
+		System.out.println("The difference is：" + (end[end.length-1]-start[0]));
 		// 在这里进行start的压缩，有什么用啊，把start信息在存放一遍，testOne中就有这个信息，需要在来一次吗
 		byte[] startPos = compressStartPos(start);
 		allRes.setStartResult(startPos);
@@ -1656,7 +1750,6 @@ public class MainEncoding2
 						if (curVal == 0)
 						{
 							qualA.add(curValQual);
-//							readsQualLength++;
 						} else
 						{
 							exception.add(readsCurrList.get(i).getException().get(0));
@@ -1685,7 +1778,6 @@ public class MainEncoding2
 							} else if (curVal == 0)
 							{
 								qualA.add(curValQual);
-//								readsQualLength++;
 							} else
 							{
 								// ArrayList<String> exception = new ArrayList<String>();
@@ -1708,7 +1800,6 @@ public class MainEncoding2
 							} else if (curVal == 0)
 							{
 								qualA.add(curValQual);
-//								readsQualLength++;
 							} else
 							{
 								// ArrayList<String> exception = new ArrayList<String>();
@@ -1870,7 +1961,8 @@ public class MainEncoding2
 		}
 
 		// 真正的pbwt处理过程，位置信息是从1开始的，所以说不可能是0
-		for (int pos = start[0]; pos <= end[endindex] + 1; pos++)
+		int pos = 0;
+		for (pos = start[0]; pos <= end[endindex] + 1; pos++)
 		{
 			// 这了不明白，为什么不能够等于0呢，为什么需要这么处理呢
 			if (pos == 0)
@@ -1918,7 +2010,6 @@ public class MainEncoding2
 						if (curVal == 0)
 						{
 							qualA.add(curValQual);
-//							readsQualLength++;
 						} else
 						{
 							exception.add(readsCurrList.get(i).getException().get(0));
@@ -1947,7 +2038,6 @@ public class MainEncoding2
 							} else if (curVal == 0)
 							{
 								qualA.add(curValQual);
-//								readsQualLength++;
 							} else
 							{
 								// ArrayList<String> exception = new ArrayList<String>();
@@ -1970,7 +2060,6 @@ public class MainEncoding2
 							} else if (curVal == 0)
 							{
 								qualA.add(curValQual);
-								readsQualLength++;
 							} else
 							{
 								// ArrayList<String> exception = new ArrayList<String>();
@@ -2038,7 +2127,6 @@ public class MainEncoding2
 				} else
 				{
 					listsPbwtQual.add((char) (avg / qualA.size()));
-					readsQualLength++;
 						
 				}
 				// for(Character chr : qualA){
@@ -2078,8 +2166,11 @@ public class MainEncoding2
 			result.setListsExcep(exceptionList);
 			result.setListExQual(exceptionListQual);
 			result.setListsQual(listsPbwtQual);
+			readsQualLength++;
 
 		}
+//		System.out.println("listsPBWT size:"+result.getListsPBWT().size());
+		System.out.println("\n"+"pos:"+(pos-start[0]));
 		System.out.println();
 		System.out.println("Original PBWT(pbwtResult.length):\t");
 		// for(int i=0; i<listsPBWT.size(); i++)
@@ -2741,6 +2832,7 @@ public class MainEncoding2
 			}
 			length = i + 1;
 		}
+//		System.out.println("huffman length \t" + length);
 		// System.out.println();
 		// System.out.println("length : "+length);
 //		for (ArrayList<String> ar : exceptionList)
@@ -2879,7 +2971,7 @@ public class MainEncoding2
 			}
 
 		}
-		print(RelativePostion);
+//		print(RelativePostion);
 		// 这里写一个压缩位置的函数，2字节存储
 		// 起始位置的处理起始和对于长度的处理是类似的
 		// 对于后续的处理也都是按照
@@ -2922,8 +3014,8 @@ public class MainEncoding2
 		}
 		startPos[j] = (byte) (flag & 0xff);
 		// flag也需要压缩一下，不然怎么知道到底是多少个字节一个长度呢。把flag放末尾，这样好找
-		for (int i = 0; i < startPos.length; i++)
-			System.out.print(startPos[i] + " ");
+//		for (int i = 0; i < startPos.length; i++)
+//			System.out.print(startPos[i] + " ");
 		return startPos;
 	}
 
