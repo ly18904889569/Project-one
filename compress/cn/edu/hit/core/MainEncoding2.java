@@ -57,10 +57,11 @@ public class MainEncoding2
 
 	public static void main(String[] args)
 	{
+		System. out .println( " 内存信息 :" + toMemoryInfo());
 		MainEncoding2 encoding = new MainEncoding2();
 
 		ReadPreProcess readPreProcess = new ReadPreProcess();
-		String filePath = "/home/yangli/Documents/compress/50X/NC_50X.fastq.sorted.bam";
+		String filePath = "/home/yangli/Documents/compress/5X/NC_5X.fastq.sorted.bam";
 		List<List<ReadInfo>> readInfos = readPreProcess.splitBamFile(filePath);
 		ReadsPreProcessResult reads = readPreProcess.readsProc(readInfos.get(0));
 
@@ -71,16 +72,19 @@ public class MainEncoding2
 		
 		long lstart1 = System.currentTimeMillis();
 		CompressResult CompressRes = encoding.EncodePbwt(reads);
+		System. out .println( " 内存信息 :" + toMemoryInfo());
 		long lend1 = System.currentTimeMillis();
 		long time = (lend1 - lstart1);
 		// 解压缩
 		ReadPbwtResult reCompressRes = encoding.DeCodePbwt(CompressRes);
+		System. out .println( " 内存信息 :" + toMemoryInfo());
 		// 正确性验证
 		ProcessIsTrue(reads, reCompressRes);
 		System.out.println(time / 1000);
 		System.out.println("Using time：" + time / 1000 / 60 / 60 + " h:" + time / 1000 / 60 % 60 + " m:"
 				+ time / 1000 % 60 + " s");
 		System.out.println("********************End********************");
+		System. out .println( " 内存信息 :" + toMemoryInfo());
 	}
 /**
  * 输出reads连续区域长度以及间隔长度
@@ -1019,6 +1023,10 @@ public class MainEncoding2
 		// byte[] startPos = compressStartPos(start);
 		// allRes.setStartResult(startPos);
 		// pbwt 变化
+		
+//		Dpbwt dpbwt = new Dpbwt();
+//		pbwtres = dpbwt.PBWTAlgo(readsList, start, end);
+		
 		pbwtres = PBWTAlgo(readsList, start, end);
 		ArrayList<ArrayList<Integer>> pbwtResult = pbwtres.getListsPBWT();
 
@@ -1488,8 +1496,7 @@ public class MainEncoding2
 		int currVal = 0, currSize = 0, currAddSize = 0; // 定义当前的
 		ArrayList<Integer> removeIndexRe = new ArrayList<Integer>();
 		Boolean removeFlag = false;
-		// exceptionList 的唯一index
-		int exceptionIndex = 0;
+		int exceptionIndex = 0;	// exceptionList 的唯一index
 		int endIndex = 0;
 		int pre = 0; // 索引空间大小
 		int cur = 0; // currentlist当前被删除元素之前序列数量
@@ -2540,10 +2547,12 @@ public class MainEncoding2
 	// 对于异常质量分数的压缩策略，最终是不能够按照索引位置进行加压缩的
 	private static byte[] EncodeExceptionQual(ArrayList<ArrayList<Character>> vE)
 	{
+		System. out .println( " 内存信息 :" + toMemoryInfo());
 		ArrayList<ArrayList<Character>> exceptionQual = vE;
 		ArrayList<ArrayList<Integer>> exceptionQualProc = new ArrayList<ArrayList<Integer>>();
 		ArrayList<Integer> keys = new ArrayList<Integer>();
-
+		System.out.println("the length of VE"+vE.size());
+		System. out .println( " 内存信息 :" + toMemoryInfo());
 		for (ArrayList<Character> qualList : exceptionQual)
 		{
 			ArrayList<Integer> qualProc = new ArrayList<Integer>();
@@ -2625,7 +2634,7 @@ public class MainEncoding2
 		// for(int i = 0; i < keys.size(); i++){
 		// eQual.put((byte)(keys.get(i)*32 + values.get(i) - 128));
 		// }
-
+		System. out .println( " 内存信息 :" + toMemoryInfo());
 		int left = 0;
 		ByteBuffer eQual2;
 		// 刚好不多的情况
@@ -2715,7 +2724,7 @@ public class MainEncoding2
 		}
 
 		byte[] eQual2By = eQual2.array();
-
+		System. out .println( " 内存信息 :" + toMemoryInfo());
 		// System.out.println("exception length:"+eQual2By.length);
 		System.out.println("the compression of exQual has completed");
 		return eQual2By;
@@ -3118,4 +3127,15 @@ public class MainEncoding2
 		char c = (char) (((b[0] & 0xFF) << 8) | (b[1] & 0xFF));
 		return c;
 	}
+	
+	 public static String toMemoryInfo() {
+		 
+	       Runtime currRuntime = Runtime.getRuntime ();
+	       int nFreeMemory = ( int ) (currRuntime.freeMemory() / 1024 / 1024);
+	       int nTotalMemory = ( int ) (currRuntime.totalMemory() / 1024 / 1024);
+	       int nMaxMemory = ( int ) (currRuntime.maxMemory() / 1024 / 1024);
+	       return nFreeMemory + "M/" + nTotalMemory + "M/" + nMaxMemory + "M(free/total/Max)" ;
+	    }
+
+	
 }

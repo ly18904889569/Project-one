@@ -26,14 +26,15 @@ public class ReadPreProcess {
 	
 	public static void main(String[] args) {
 		ReadPreProcess readPreProcess = new ReadPreProcess();
-		String filePath = "/home/yangli/Documents/compress/50X/NC_50X.fastq.sorted.bam";//"/home/rivers/riversdoc/test.sorted.bam";
+		String filePath = "/home/yangli/Documents/compress/5X/NC_5X.fastq.sorted.bam";//"/home/rivers/riversdoc/test.sorted.bam";
 //		String filePath = "/home/rivers/riversdoc/compress/chr21.fa.fasta.sam.copy2";
 //		String filePath = "/home/liyang/Document/compress/input/50X/NC_50X.fastq.sorted.bam";
-		List<List<ReadInfo>> readInfos = readPreProcess.splitBamFile(filePath);
+//		List<List<ReadInfo>> readInfos = readPreProcess.splitBamFile(filePath);
+		List<List<ReadInfo>> readInfos = readPreProcess.splitBamFile2(filePath,10);
 		//就在这里，把结果输出去看一下
 		try{
 			//这部分内容输出的很OK，没有任何的问题
-			PrintWriter writer = new PrintWriter("/home/yangli/Documents/compress/documents/50X-readResult2.txt", "UTF-8");	///home/rivers/riversdoc/compress/readResult.txt
+			PrintWriter writer = new PrintWriter("/home/yangli/Documents/compress/documents/5X-readResult2.txt", "UTF-8");	///home/rivers/riversdoc/compress/readResult.txt
 //			PrintWriter writer = new PrintWriter("/home/liyang/Document/compress/output/50X/50X-all/50X-readResult2.txt", "UTF-8");
 			System.out.println("The first list.size:\t" + readInfos.get(0).size());	//liyang：取第一份kmod
 			System.out.println("The second list.size:\t" + readInfos.get(1).size());	//liyang:这个是自己加的
@@ -57,7 +58,7 @@ public class ReadPreProcess {
 		try {
 			//这部分是有问题的，问题主要在于最后的END，在SS的情形下，处理是不正确的
 			//上面注释的这个问题应该解决了，后续再验证一遍，同时去掉无意义的注释
-			PrintWriter writer = new PrintWriter("/home/yangli/Documents/compress/documents/50X-readProcessResult2.txt", "UTF-8");	///home/rivers/riversdoc/compress/readProcessResult.txt
+			PrintWriter writer = new PrintWriter("/home/yangli/Documents/compress/documents/5X-readProcessResult2.txt", "UTF-8");	///home/rivers/riversdoc/compress/readProcessResult.txt
 //			PrintWriter writer = new PrintWriter("/home/liyang/Document/compress/output/50X/50X-all/50X-readProcessResult2.txt", "UTF-8");
 			for (int i =0; i < processResult.getReadsInfo().size(); i++){
 				writer.println("reads After process:\t" + processResult.getReadsInfo().get(i).getReads());
@@ -125,6 +126,56 @@ public class ReadPreProcess {
 		System.out.println("count:\t"+count);
 		return readInfos;
 	}
+	
+	public List<List<ReadInfo>> splitBamFile2(String filePath, int seeds) {
+		
+		File sortedBamFile = new File(filePath);
+		SAMFileReader inputSam = new SAMFileReader(sortedBamFile);
+		inputSam.setValidationStringency(ValidationStringency.LENIENT);
+		
+		SAMRecordIterator samit = inputSam.iterator();
+		SAMRecord rec = null;
+		List<List<ReadInfo>> readInfos = new ArrayList<List<ReadInfo>>();
+		int count = 0;
+		int kMod = 0;	//每1000条reads一截断		这里为什么是20000000，不是说好的1000条为一截段		//liyang：这里原先是200000000，但是如果是1000条算作是一个的话这个数量有点大，我打算改为1000
+		List<ReadInfo> readInfoList = new ArrayList<ReadInfo>();
+		
+		
+		while (samit.hasNext()) 
+		{	
+			//liyang：这一段的作用就是把SAM文件的信息截取出来
+			rec = samit.next();
+			
+			//下面这一段本来是注释掉的，我又给加上了，因为如果不加上，是不会有数据的。
+			//count++;				//liyang:这里要是不注释掉的话，count会在这里和接下来连续进行两次++
+			ReadInfo readInfo = new ReadInfo();		//liyang：这里注释掉的话，就不会将Sam文件格式中的信息分割
+			readInfo.setAlignmentStart(rec.getAlignmentStart());
+			readInfo.setMateAlignmentStart(rec.getMateAlignmentStart());
+			readInfo.setAlignmentEnd(rec.getAlignmentEnd());
+			readInfo.setCigarString(rec.getCigarString());
+			readInfo.setReadString(rec.getReadString());
+			readInfo.setFlag(rec.getFlags());
+			readInfo.setReadLength(rec.getReadLength());
+			readInfo.setQuality(rec.getBaseQualityString());
+			readInfoList.add(readInfo);		//readInfoList存放的就是多个readInfo也就是说
+			count++;
+		}
+		//最后一次的结果单独处理一下
+		int num =count/seeds;
+		int firstIndex = 0;
+		int lastIndex = count;
+		for(int i=0; i<seeds-1; i++)
+		{
+			firstIndex = i * num;
+			lastIndex = (i+1) * num;
+			readInfos.add(readInfoList.subList(firstIndex, lastIndex));
+		}
+		readInfos.add(readInfoList.subList(lastIndex, count));
+		System.out.println("precount:"+readInfos.get(0).size());
+		System.out.println("count:\t"+count);
+		return readInfos;
+	}
+	
 	
 	/**
 	 * 读取BAM文件，并处理成ReadPreProcessModel的集合形式
