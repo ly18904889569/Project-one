@@ -17,8 +17,19 @@ public class ReadPbwtResult
 	
 	private ArrayList<Character> listExQual2;
 	
+	private ArrayList<ArrayList<Integer>> indexes;
 	
 	
+	public ArrayList<ArrayList<Integer>> getIndexes()
+	{
+		return indexes;
+	}
+
+	public void setIndexes(ArrayList<ArrayList<Integer>> indexes)
+	{
+		this.indexes = indexes;
+	}
+
 	public ArrayList<Character> getListExQual2()
 	{
 		return listExQual2;

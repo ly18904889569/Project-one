@@ -295,161 +295,163 @@ public class PbwtTest3 {
 		test.PBWTAlgo();
 		System.out.println("PBWTAlgo End...");
 
-		try {
-			Thread.sleep(10000);
-		} catch (Exception e) {
-
-		}
-		/**
-		 * 这个下面就是原生的PBWT的实现方法
-		 */
-		// random a serious number
-		Random rand = new Random();
-
-		// initial list
-		List<List<Integer>> listsOri = new ArrayList();
-		List<List<Integer>> listsConvert = new ArrayList();
-		List<List<Integer>> listsPBWT = new ArrayList();
-		List<List<Integer>> listsPbwtRe = new ArrayList();
-		for (int i = 0; i < 15; i++) {
-			List<Integer> list = new ArrayList();
-			for (int j = 0; j < 30; j++) {
-				list.add(rand.nextInt(2));
-			}
-			listsOri.add(list);
-		}
-
-		// write into file
-		PrintWriter writer = null;
-		try {
-			writer = new PrintWriter("/home/rivers/riversdoc/compress/pbwt.txt", "UTF-8");
-		} catch (Exception e) {
-		}
-
-		writer.flush();
-		writer.println("Origional data:");
-		for (int i = 0; i < listsOri.size(); i++) {
-			for (Integer ins : listsOri.get(i)) {
-				writer.print(ins);
-			}
-			writer.println();
-		}
-		writer.flush();
-		// writer.close();
-
-		// row convert to col
-		// i row size, j col size
-		for (int j = 0; j < listsOri.get(0).size(); j++) {
-			ArrayList<Integer> listConvert = new ArrayList<Integer>();
-			for (int i = 0; i < listsOri.size(); i++) {
-				listConvert.add(listsOri.get(i).get(j));
-			}
-			listsConvert.add(listConvert);
-		}
-
-		writer.println("Convert data:");
-		for (int i = 0; i < listsConvert.size(); i++) {
-			for (Integer ins : listsConvert.get(i)) {
-				System.out.print(ins);
-				writer.print(ins);
-			}
-			System.out.println();
-			writer.println();
-		}
-		writer.flush();
-
-		System.out.println("Write Convert data OK.");
-
-		// Encode pbwt 最后编写完成了，是按列在存储的
-		// init array a,b to story data
-		List<Integer> a = new ArrayList();
-		List<Integer> b = new ArrayList();
-		// i row size, j col size
-		for (int i = 0; i < listsConvert.size(); i++) {
-			List<Integer> listPBWT = new ArrayList();
-			for (int j = 0; j < listsConvert.get(0).size(); j++) {
-				// the first column
-				if (i == 0) {
-					listPBWT.add(listsConvert.get(i).get(j));
-				}
-				// not first column
-				else if (listsPBWT.get(i - 1).get(j) == 0) {
-					a.add(listsConvert.get(i).get(j));
-				} else {
-					b.add(listsConvert.get(i).get(j));
-				}
-			}
-			// add pbwt value to listsPBWT
-			for (Integer ins : a) {
-				listPBWT.add(ins);
-			}
-			for (Integer ins : b) {
-				listPBWT.add(ins);
-			}
-			a.clear();
-			b.clear();
-			listsPBWT.add(listPBWT);
-		}
-
-		// write pbwt file
-		writer.println("PBWT Convert.");
-		for (int i = 0; i < listsPBWT.size(); i++) {
-			for (Integer ins : listsPBWT.get(i)) {
-				System.out.print(ins);
-				writer.print(ins);
-			}
-			System.out.println();
-			writer.println();
-		}
-		writer.flush();
-
-		System.out.println("Write PBWT Convert OK.");
-
-		// pbwt file convert to Original file
-		List<Integer> c = new ArrayList();
-		List<Integer> d = new ArrayList();
-		// i row size, j col size
-		for (int i = 0; i < listsPBWT.size(); i++) {
-			List<Integer> listPbwtRe = new ArrayList();
-			for (int j = 0; j < listsPBWT.get(0).size(); j++) {
-				if (i == 0) {
-					listPbwtRe.add(listsPBWT.get(i).get(j));
-				} else if (listsPBWT.get(i - 1).get(j) == 0) {
-					// store the location
-					c.add(j);
-				} else {
-					d.add(j);
-				}
-			}
-			Integer[] e = new Integer[listsPBWT.get(0).size()];
-			int k = 0;
-			for (Integer ins : c) {
-				e[ins] = listsPBWT.get(i).get(k++);
-			}
-			for (Integer ins : d) {
-				e[ins] = listsPBWT.get(i).get(k++);
-			}
-			c.clear();
-			d.clear();
-			if (i != 0) {
-				listPbwtRe = Arrays.asList(e);
-			}
-			listsPbwtRe.add(listPbwtRe);
-		}
-
-		// write pbwt file re
-		writer.println("PBWT Convert Re.");
-		for (int i = 0; i < listsPbwtRe.size(); i++) {
-			for (Integer ins : listsPbwtRe.get(i)) {
-				System.out.print(ins);
-				writer.print(ins);
-			}
-			System.out.println();
-			writer.println();
-		}
-		writer.flush();
-
-		System.out.println("Write PBWT  Re Convert OK.");
+//		全都暂时注释掉没什么用
+		
+//		try {
+//			Thread.sleep(10000);
+//		} catch (Exception e) {
+//
+//		}
+//		/**
+//		 * 这个下面就是原生的PBWT的实现方法
+//		 */
+//		// random a serious number
+//		Random rand = new Random();
+//
+//		// initial list
+//		List<List<Integer>> listsOri = new ArrayList();
+//		List<List<Integer>> listsConvert = new ArrayList();
+//		List<List<Integer>> listsPBWT = new ArrayList();
+//		List<List<Integer>> listsPbwtRe = new ArrayList();
+//		for (int i = 0; i < 15; i++) {
+//			List<Integer> list = new ArrayList();
+//			for (int j = 0; j < 30; j++) {
+//				list.add(rand.nextInt(2));
+//			}
+//			listsOri.add(list);
+//		}
+//
+//		// write into file
+//		PrintWriter writer = null;
+//		try {
+//			writer = new PrintWriter("/home/rivers/riversdoc/compress/pbwt.txt", "UTF-8");
+//		} catch (Exception e) {
+//		}
+//
+//		writer.flush();
+//		writer.println("Origional data:");
+//		for (int i = 0; i < listsOri.size(); i++) {
+//			for (Integer ins : listsOri.get(i)) {
+//				writer.print(ins);
+//			}
+//			writer.println();
+//		}
+//		writer.flush();
+//		// writer.close();
+//
+//		// row convert to col
+//		// i row size, j col size
+//		for (int j = 0; j < listsOri.get(0).size(); j++) {
+//			ArrayList<Integer> listConvert = new ArrayList<Integer>();
+//			for (int i = 0; i < listsOri.size(); i++) {
+//				listConvert.add(listsOri.get(i).get(j));
+//			}
+//			listsConvert.add(listConvert);
+//		}
+//
+//		writer.println("Convert data:");
+//		for (int i = 0; i < listsConvert.size(); i++) {
+//			for (Integer ins : listsConvert.get(i)) {
+//				System.out.print(ins);
+//				writer.print(ins);
+//			}
+//			System.out.println();
+//			writer.println();
+//		}
+//		writer.flush();
+//
+//		System.out.println("Write Convert data OK.");
+//
+//		// Encode pbwt 最后编写完成了，是按列在存储的
+//		// init array a,b to story data
+//		List<Integer> a = new ArrayList();
+//		List<Integer> b = new ArrayList();
+//		// i row size, j col size
+//		for (int i = 0; i < listsConvert.size(); i++) {
+//			List<Integer> listPBWT = new ArrayList();
+//			for (int j = 0; j < listsConvert.get(0).size(); j++) {
+//				// the first column
+//				if (i == 0) {
+//					listPBWT.add(listsConvert.get(i).get(j));
+//				}
+//				// not first column
+//				else if (listsPBWT.get(i - 1).get(j) == 0) {
+//					a.add(listsConvert.get(i).get(j));
+//				} else {
+//					b.add(listsConvert.get(i).get(j));
+//				}
+//			}
+//			// add pbwt value to listsPBWT
+//			for (Integer ins : a) {
+//				listPBWT.add(ins);
+//			}
+//			for (Integer ins : b) {
+//				listPBWT.add(ins);
+//			}
+//			a.clear();
+//			b.clear();
+//			listsPBWT.add(listPBWT);
+//		}
+//
+//		// write pbwt file
+//		writer.println("PBWT Convert.");
+//		for (int i = 0; i < listsPBWT.size(); i++) {
+//			for (Integer ins : listsPBWT.get(i)) {
+//				System.out.print(ins);
+//				writer.print(ins);
+//			}
+//			System.out.println();
+//			writer.println();
+//		}
+//		writer.flush();
+//
+//		System.out.println("Write PBWT Convert OK.");
+//
+//		// pbwt file convert to Original file
+//		List<Integer> c = new ArrayList();
+//		List<Integer> d = new ArrayList();
+//		// i row size, j col size
+//		for (int i = 0; i < listsPBWT.size(); i++) {
+//			List<Integer> listPbwtRe = new ArrayList();
+//			for (int j = 0; j < listsPBWT.get(0).size(); j++) {
+//				if (i == 0) {
+//					listPbwtRe.add(listsPBWT.get(i).get(j));
+//				} else if (listsPBWT.get(i - 1).get(j) == 0) {
+//					// store the location
+//					c.add(j);
+//				} else {
+//					d.add(j);
+//				}
+//			}
+//			Integer[] e = new Integer[listsPBWT.get(0).size()];
+//			int k = 0;
+//			for (Integer ins : c) {
+//				e[ins] = listsPBWT.get(i).get(k++);
+//			}
+//			for (Integer ins : d) {
+//				e[ins] = listsPBWT.get(i).get(k++);
+//			}
+//			c.clear();
+//			d.clear();
+//			if (i != 0) {
+//				listPbwtRe = Arrays.asList(e);
+//			}
+//			listsPbwtRe.add(listPbwtRe);
+//		}
+//
+//		// write pbwt file re
+//		writer.println("PBWT Convert Re.");
+//		for (int i = 0; i < listsPbwtRe.size(); i++) {
+//			for (Integer ins : listsPbwtRe.get(i)) {
+//				System.out.print(ins);
+//				writer.print(ins);
+//			}
+//			System.out.println();
+//			writer.println();
+//		}
+//		writer.flush();
+//
+//		System.out.println("Write PBWT  Re Convert OK.");
 
 		System.out.println("END");
 

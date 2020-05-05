@@ -27,9 +27,26 @@ public class VerticalEncode
 		ReadPreProcess readPreProcess = new ReadPreProcess();
 		List<List<ReadInfo>> readInfos = readPreProcess.splitBamFile2(filePath,seeds);
 		reads = readPreProcess.readsProc(readInfos.get(0));
+		
 		this.Init(reads);
+//		Init(readPreProcess.readsProc(readInfos.get(1)));
+//		Init(readPreProcess.readsProc(readInfos.get(2)));
 	}
 	
+	public VerticalEncode(String filePath, String writePath, int seeds)
+	{
+		allRes = new CompressResult();
+		ReadsPreProcessResult reads = new ReadsPreProcessResult();
+		ReadPreProcess readPreProcess = new ReadPreProcess();
+		List<List<ReadInfo>> readInfos = readPreProcess.splitBamFile2(filePath,seeds);
+		for(int i=0; i<seeds; i++)
+		{
+			reads = readPreProcess.readsProc(readInfos.get(i));
+			this.Init(reads);
+			Main.WriteBy(writePath, this, i);
+		}
+		
+	}
 	
 	private void Init(ReadsPreProcessResult reads)
 	{

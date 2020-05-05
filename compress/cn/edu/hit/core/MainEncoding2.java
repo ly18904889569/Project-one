@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
@@ -46,6 +47,8 @@ import htsjdk.samtools.seekablestream.ISeekableStreamFactory;
 public class MainEncoding2
 {
 	static CompressResult allRes = new CompressResult();
+	
+	static ArrayList<ArrayList<Integer>> tempIndexes = new ArrayList<>();
 
 	static ArrayList<String> exBackUp = new ArrayList<String>();
 
@@ -60,29 +63,30 @@ public class MainEncoding2
 		System. out .println( " 内存信息 :" + toMemoryInfo());
 		MainEncoding2 encoding = new MainEncoding2();
 
-		ReadPreProcess readPreProcess = new ReadPreProcess();
-		String filePath = "/home/yangli/Documents/compress/5X/NC_5X.fastq.sorted.bam";
-		List<List<ReadInfo>> readInfos = readPreProcess.splitBamFile(filePath);
-		ReadsPreProcessResult reads = readPreProcess.readsProc(readInfos.get(0));
+//		ReadPreProcess readPreProcess = new ReadPreProcess();
+//		String filePath = "/home/yangli/Documents/compress/5X/NC_5X.fastq.sorted.bam";
+//		List<List<ReadInfo>> readInfos = readPreProcess.splitBamFile(filePath);
+//		ReadsPreProcessResult reads = readPreProcess.readsProc(readInfos.get(0));
 
 		// reads 还需要经过一段处理，转化为Test1格式的数据
-		// Test1 testOne = new Test1(4);
-
+		 Test1 testOne = new Test1(4);
+		 CompressResult testCompress = encoding.EncodePbwt(testOne);
+		 ReadPbwtResult reCompressRes = encoding.DeCodePbwt(testCompress);
 //		PrintInterval(reads);
 		
-		long lstart1 = System.currentTimeMillis();
-		CompressResult CompressRes = encoding.EncodePbwt(reads);
-		System. out .println( " 内存信息 :" + toMemoryInfo());
-		long lend1 = System.currentTimeMillis();
-		long time = (lend1 - lstart1);
+//		long lstart1 = System.currentTimeMillis();
+//		CompressResult CompressRes = encoding.EncodePbwt(reads);
+//		System. out .println( " 内存信息 :" + toMemoryInfo());
+//		long lend1 = System.currentTimeMillis();
+//		long time = (lend1 - lstart1);
 		// 解压缩
-		ReadPbwtResult reCompressRes = encoding.DeCodePbwt(CompressRes);
+//		ReadPbwtResult reCompressRes = encoding.DeCodePbwt(CompressRes);
 		System. out .println( " 内存信息 :" + toMemoryInfo());
 		// 正确性验证
-		ProcessIsTrue(reads, reCompressRes);
-		System.out.println(time / 1000);
-		System.out.println("Using time：" + time / 1000 / 60 / 60 + " h:" + time / 1000 / 60 % 60 + " m:"
-				+ time / 1000 % 60 + " s");
+//		ProcessIsTrue(reads, reCompressRes);
+//		System.out.println(time / 1000);
+//		System.out.println("Using time：" + time / 1000 / 60 / 60 + " h:" + time / 1000 / 60 % 60 + " m:"
+//				+ time / 1000 % 60 + " s");
 		System.out.println("********************End********************");
 		System. out .println( " 内存信息 :" + toMemoryInfo());
 	}
@@ -178,11 +182,12 @@ public class MainEncoding2
 
 		reResult.setListsPBWT(DecodePBWT(compressRes.getReadsResult()));
 
-		reResult.setListsExcep2(Arrays.asList(deEncodeExceptionList(compressRes.getExceptionResult())));
+//		reResult.setListsExcep2(Arrays.asList(deEncodeExceptionList(compressRes.getExceptionResult())));
+		deEncodeExceptionList2(compressRes.getExceptionResult());
+		
+//		reResult.setListsQual(deEncodeQual2(compressRes.getReadQuaReasult()));
 
-		reResult.setListsQual(deEncodeQual2(compressRes.getReadQuaReasult()));
-
-		reResult.setListExQual2(deEncodeExceptionQual2(compressRes.getExceptionQuaResult()));
+//		reResult.setListExQual2(deEncodeExceptionQual2(compressRes.getExceptionQuaResult()));
 
 		return reResult;
 	}
@@ -630,11 +635,11 @@ public class MainEncoding2
 
 	/**
 	 * 针对索引压缩的
-	 * 
+	 * 插入压缩
 	 * @param array
 	 * @return
 	 */
-	public static String[] deEncodeExceptionList2(byte[] array)
+	public static ArrayList<ArrayList<String>> deEncodeExceptionList2(byte[] array)
 	{
 		String byte2EncodeResult = "";
 		String tempbyte2 = "";
@@ -671,7 +676,7 @@ public class MainEncoding2
 		// decodeResult2+="|"; // 这里可能会影响速度，之后再改
 
 		ArrayList<ArrayList<String>> deResult = new ArrayList<ArrayList<String>>();
-		String[] deTemp = decodeResult2.split("\\|");
+		String[] deTemp = decodeResult2.split("\\|",-1);
 		// 点隔开这里明天继续,注意空的问题
 		for (String str : deTemp)
 		{
@@ -681,8 +686,10 @@ public class MainEncoding2
 			{
 				templist.add(str2);
 			}
+			deResult.add(templist);
 		}
-		return null;
+
+		return deResult;
 	}
 
 	/**
@@ -877,7 +884,16 @@ public class MainEncoding2
 			readsList.add(struct);
 		}
 		// pbwt 变化
-		pbwtres = PBWTAlgo(readsList, start, end);
+//		pbwtres = PBWTAlgo(readsList, start, end);
+		// 这里改写为我们正确的排序算法
+		
+//		pbwtres = PBWTAlgo2(readsList, start, end);
+		
+//		局部解压缩算法压缩过程
+		pbwtres = PBWTAlgo3(readsList, start, end);
+		
+		
+		
 		ArrayList<ArrayList<Integer>> pbwtResult = pbwtres.getListsPBWT();
 
 		// ArrayList<ArrayList<Integer>> repbwt = PBWTAlgoRe(pbwtResult, start,end); //
@@ -927,7 +943,7 @@ public class MainEncoding2
 		// PbwtIsTrue(pbwtResult,rePBWT);
 
 		// 在这里进行余下的几个部分的压缩工作
-		byte[] exBy = EncodeExceptionList(pbwtres.getListsExcep());
+		byte[] exBy = EncodeExceptionList3(pbwtres.getListsExcep());
 		// MainEncoding2.deEncodeExceptionList(exBy);
 		// 需要改两处，一个是质量分数都全部认为是char，然后是正常质量分数一列是一个值
 		byte[] exQual = EncodeExceptionQual(pbwtres.getListExQual());
@@ -943,6 +959,7 @@ public class MainEncoding2
 		return allRes;
 	}
 
+	
 	/**
 	 * 针对真实数据的压缩算法
 	 * 
@@ -1171,71 +1188,80 @@ public class MainEncoding2
 
 		for (ArrayList<Integer> listPbwt : pbwtResult)
 		{
-			countZero = 0;
-			countOne = 0;
-			countThree = 0;
+			// 当一列并无元素时候，直接加入占位符号2就行
+			if (listPbwt.isEmpty())
+			{
+				keys.add(2);
+				values.add(1);
+			}else {
+				countZero = 0;
+				countOne = 0;
+				countThree = 0;
+				for (int i = 0; i < listPbwt.size(); i++)
+				{ // liyang:纵向进行
+					curVal = listPbwt.get(i);
+					if (i != 0 && curVal != preVal)
+					{ // 把i为0的起始条件排除掉，因为其实位置之前没有preVal
+						if (preVal == 0)
+						{
+							keys.add(0);
+							values.add(countZero);
+						} else if (preVal == 1)
+						{
+							keys.add(1);
+							values.add(countOne);
+						} else
+						{
+							keys.add(3);
+							values.add(countThree);
+						}
+						// 计数器清零
+						countZero = 0;
+						countOne = 0;
+						countThree = 0;
 
-			for (int i = 0; i < listPbwt.size(); i++)
-			{ // liyang:纵向进行
-				curVal = listPbwt.get(i);
-				if (i != 0 && curVal != preVal)
-				{ // 把i为0的起始条件排除掉，因为其实位置之前没有preVal
-					if (preVal == 0)
-					{
-						keys.add(0);
-						values.add(countZero);
-					} else if (preVal == 1)
-					{
-						keys.add(1);
-						values.add(countOne);
-					} else
-					{
-						keys.add(3);
-						values.add(countThree);
 					}
-					// 计数器清零
-					countZero = 0;
-					countOne = 0;
-					countThree = 0;
-				}
 
-				preVal = curVal; // liyang:因为是起始位置，这样就会默认计数为1
-				if (curVal == 0)
-				{
-					countZero++;
-				} else if (curVal == 1)
-				{
-					countOne++;
-				} else if (curVal == 3)
-				{
-					countThree++;
-				} else
-				{
-					System.out.println("readsRL count Error....");
-				}
-				if (i == listPbwt.size() - 1)
-				{ // liyang：处理最后一个元素，同时也是退出这里垂直编码
-					// 处理到最后一个元素了
+					preVal = curVal; // liyang:因为是起始位置，这样就会默认计数为1
 					if (curVal == 0)
 					{
-						keys.add(0);
-						values.add(countZero);
+						countZero++;
 					} else if (curVal == 1)
 					{
-						keys.add(1);
-						values.add(countOne);
+						countOne++;
+					}else if (curVal == 3)
+					{
+						countThree++;
 					} else
 					{
-						keys.add(3);
-						values.add(countThree);
+						System.out.println("readsRL count Error....");
 					}
-					// 同时加入结束的分隔符
-					// 暂作为间隔符使用,在这里不会有2出现，用2来表示单条listpbwt的终止
-					// 需要加上这个2吗，2作为一条listpbwt的终止
-					keys.add(2);
-					values.add(1);
+					if (i == listPbwt.size() - 1)
+					{ // liyang：处理最后一个元素，同时也是退出这里垂直编码
+						// 处理到最后一个元素了
+						if (curVal == 0)
+						{
+							keys.add(0);
+							values.add(countZero);
+						} else if (curVal == 1)
+						{
+							keys.add(1);
+							values.add(countOne);
+						} else
+						{
+							keys.add(3);
+							values.add(countThree);
+						}
+						// 同时加入结束的分隔符
+						// 暂作为间隔符使用,在这里不会有2出现，用2来表示单条listpbwt的终止
+						// 需要加上这个2吗，2作为一条listpbwt的终止
+						keys.add(2);
+						values.add(1);
+					}
 				}
+				
 			}
+
 		}
 	}
 
@@ -1353,7 +1379,7 @@ public class MainEncoding2
 		reList = reListPbwt(bKeysFromByte, bValsFromByte);
 
 		// result 这里需要pbwt还原
-		result = PBWTAlgoRe(reList);
+		result = PBWTAlgoRe2(reList);
 
 		return result;
 
@@ -1663,6 +1689,165 @@ public class MainEncoding2
 		return readsResult;
 	}
 
+	// 这里还需要参数ak，改一下函数传进来这个参数。暂时用静态变量进行处理
+	private static ArrayList<ArrayList<Integer>> PBWTAlgoRe2(ArrayList<ArrayList<Integer>> pbwtResult)
+	{
+		PBWTReadRe pbwtReadRe = new PBWTReadRe();
+		ArrayList<ArrayList<Integer>> readsResult = new ArrayList<ArrayList<Integer>>();
+		ArrayList<ArrayList<Integer>> readsCurrListTemp = new ArrayList<ArrayList<Integer>>();
+
+		pbwtReadRe.setReadsResult(readsResult);
+		
+		int indexpos = -1;
+		int posValue = -1;
+
+		int preSize = 0; // 定义之前的碱基值和之前列的大小
+		int currSize = 0, currAddSize = 0; // 定义当前的
+		ArrayList<Integer> removeIndexRe = new ArrayList<Integer>();
+		Boolean removeFlag = false;
+		int pre = 0; // 索引空间大小
+		int cur = 0; // currentlist当前被删除元素之前序列数量
+		LinkedList<Integer> posIndex = new LinkedList<Integer>(); // 位置索引表，表示插入到输出list中位置
+		// 比对完之后从左往右
+		for (int col = 0; col < pbwtResult.size(); col++)
+		{
+			preSize = readsCurrListTemp.size();
+			currSize = pbwtResult.get(col).size(); // liyang：没有currsize的大小是1,这就说明了这里只是拿出了第一个容器
+			currAddSize = currSize > preSize ? (currSize - preSize) : 0; // crazy：这里的目的是为了后面构造还原空间的
+			// 只有对第一列处理比较特殊，其他都是正常，前一个大小就是前一列的大小
+			// 构造还原空间
+			for (int i = 0; i < currAddSize; i++)
+			{
+				ArrayList<Integer> listTemp = new ArrayList<Integer>();
+				readsCurrListTemp.add(listTemp);
+			}
+			if (!readsCurrListTemp.isEmpty())
+			{
+				if (col == 0 || preSize == 0)
+				{
+					// 针对第一列的情形，做一下特殊化的处理，全部加入到临时temp中
+					for (int i = 0; i < readsCurrListTemp.size(); i++)
+					{
+						readsCurrListTemp.get(i).add(pbwtResult.get(col).get(i));
+						// 这是质量数部分的处理
+						// qualReadsCurrListTemp.get(i).add(listsPbwtQual.get(col).get(i));
+					}
+					continue;
+				}
+				// 还原的时候是按照存放之前位置的索引，来从前往后进行还原
+				// 比对完之后从上往下
+				for (int row = 0; row < currSize; row++)
+				{
+					indexpos = tempIndexes.get(col).get(row);
+					posValue = pbwtResult.get(col).get(row);
+					
+					// posvalue是3的情况，需要记录indexpos方便之后删除
+					if (posValue ==ReadElemEnum.END.ordinal() )
+					{
+						readsCurrListTemp.get(indexpos).add(posValue);
+						removeIndexRe.add(indexpos);
+						removeFlag = true;
+					}
+					// 按照row找到ak数组中对应的indexpos，然后找到将这个值放到indexpos位置
+					else 
+					{
+						readsCurrListTemp.get(indexpos).add(posValue);
+					}
+				}
+
+				int offset = 0; // 因为有偏移，所以需要offset
+				Collections.sort(removeIndexRe);
+				for (Integer ins : removeIndexRe)
+				{
+				 	pre = posIndex.size();
+					cur = ins - offset;
+					if (pre == cur)
+					{
+						// 加在末尾
+						readsResult.add(readsCurrListTemp.get(ins - offset));
+//						System.out.println(readsCurrListTemp.get(ins - offset));
+						readsCurrListTemp.remove(ins - offset);
+					} 
+					else if (pre < cur)
+					{
+						// 在末尾加上站位符号，并将删除的序列加入到最后
+						for (int i = 0; i < (cur - pre); i++)
+						{
+							ArrayList<Integer> empty = new ArrayList<Integer>();
+							readsResult.add(empty);
+							posIndex.add(readsResult.size() - 1);
+						}
+						readsResult.add(readsCurrListTemp.get(ins - offset));
+//						System.out.println(readsCurrListTemp.get(ins - offset));
+						readsCurrListTemp.remove(ins - offset);
+					}
+					// 此时表明之前没有出去的序列要出去
+					else
+					{
+						int pos = posIndex.get(cur);
+						posIndex.remove(cur);
+						readsResult.set(pos, readsCurrListTemp.get(ins - offset));
+//						System.out.println(readsCurrListTemp.get(ins - offset));
+						readsCurrListTemp.remove(ins - offset);
+					}
+					offset++;
+				}
+				removeIndexRe.clear();
+				removeFlag = false;
+			}
+			else {
+				
+			}
+			
+		}
+		System.out.println("PBWT Convert Re.(readResult.length):\t");
+//		for (int i = 0; i < readsResult.size(); i++)
+//		{
+//			System.out.println(readsResult.get(i).toString());
+//		}
+
+		return readsResult;
+	}
+
+	/**
+	 * 用于插入压缩问题，垂直方向解压缩，方便再次进行压缩
+	 * @param pbwtResult
+	 * @return
+	 */
+	private static ArrayList<ArrayList<Integer>> PBWTAlgoRe3(ArrayList<ArrayList<Integer>> pbwtResult)
+	{
+		PBWTReadRe pbwtReadRe = new PBWTReadRe();
+		ArrayList<ArrayList<Integer>> readsResult = new ArrayList<ArrayList<Integer>>();
+		ArrayList<ArrayList<Integer>> readsCurrListTemp = new ArrayList<ArrayList<Integer>>();
+		pbwtReadRe.setReadsResult(readsResult);
+
+		int curIndex = -1;
+		int curValue = -1;
+		int nextemp = -1;
+		int j = 0;
+		for (int i = 0; i < pbwtResult.size(); i++)
+		{
+			j = 0;
+			curIndex = tempIndexes.get(i).get(0);
+			curValue = pbwtResult.get(i).get(0);
+			while (j < pbwtResult.get(i).size())
+			{
+				nextemp = pbwtResult.get(i).get(curIndex);
+				pbwtResult.get(i).set(curIndex, curValue);
+				curValue = nextemp;
+				curIndex = tempIndexes.get(i).get(curIndex);
+				j++;
+			}
+
+			// pbwtResult.get(i).
+		}
+
+		System.out.println("PBWT Convert Re.(readResult.length):\t");
+
+		return readsResult;
+	}
+
+	
 	// 这里处理有一个问题就是，我把pbwt的变化也加入其中了。但是之前进行质量分数的压缩是没哟经过pbwt变化的质量分数的压缩。
 	// 最后我们需要看看到底考没考虑最特殊的情况就是完全匹配上去的情况
 	private ReadPbwtResult PBWTAlgo(ArrayList<ReadStruct> readsList, Integer[] start, Integer[] end)
@@ -1924,22 +2109,26 @@ public class MainEncoding2
 		return result;
 	}
 
-	private ReadPbwtResult PBWTAlgo(ArrayList<ReadStruct> readsList, int[] start, int[] end)
+
+	private ReadPbwtResult PBWTAlgo2(ArrayList<ReadStruct> readsList, Integer[] start, Integer[] end)
 	{
 		ArrayList<Integer> a = new ArrayList<Integer>(); // 存储为0的值
 		ArrayList<Integer> b = new ArrayList<Integer>(); // 存储为1的值
 		ArrayList<Integer> c = new ArrayList<Integer>(); // 存储新加入的值，在这里，就是ReadElemEnum.START部分 liyang:应该是存储3
-
+		
+		// 用于构建ak数组
+		ArrayList<Integer> A = new ArrayList<Integer>();
+		ArrayList<Integer> B = new ArrayList<Integer>();
+		ArrayList<Integer> C = new ArrayList<Integer>();
 		ArrayList<Character> qualA = new ArrayList<Character>();
-		// ArrayList<Character> qualB = new ArrayList<Character>();
-		// ArrayList<Character> qualC = new ArrayList<Character>();
-		ArrayList<Integer> removeIndex = new ArrayList<Integer>();
 
 		ArrayList<ArrayList<Integer>> listsPBWT = new ArrayList<ArrayList<Integer>>();
 		ArrayList<Character> listsPbwtQual = new ArrayList<Character>();
 		ArrayList<ArrayList<String>> exceptionList = new ArrayList<ArrayList<String>>();
 		ArrayList<ArrayList<Character>> exceptionListQual = new ArrayList<ArrayList<Character>>();
 
+		ArrayList<ArrayList<Integer>> indexes = new ArrayList<>();	// 用于存储所有的ak
+		
 		ArrayList<ReadStruct> readsCurrList = new ArrayList<ReadStruct>();
 		ReadPbwtResult result = new ReadPbwtResult();
 
@@ -1969,6 +2158,7 @@ public class MainEncoding2
 
 		// 真正的pbwt处理过程，位置信息是从1开始的，所以说不可能是0
 		int pos = 0;
+		boolean emptyFlag = true;	// 用于监测collection是非为空
 		for (pos = start[0]; pos <= end[endindex] + 1; pos++)
 		{
 			// 这了不明白，为什么不能够等于0呢，为什么需要这么处理呢
@@ -1978,148 +2168,122 @@ public class MainEncoding2
 				continue;
 			}
 
+//			这里的目的就是为了初始化ak数组，这个顺序不能改
+			if(readsCurrList.isEmpty())
+			{
+				emptyFlag = true;
+			}
 			if (currPosDist == 0) // liyang：这里是每条新的序列才能够进行的，只有currposdist减到0,才能加入下一条序列
 			{
 				while (enter < end.length && start[enter] == pos) // 有新元素进队列的情形 liyang：这里这个设计非常的完美pos一直加，而currposdist一直减
 				{
 					readsCurrList.add(readsList.get(readsIndex++)); // liyang:序列从横向的排列变成了纵向的排列，把所有的开头位置一样的先存储一下
 					enter++;
-				}
+				}					
 				if (enter < end.length)
 				{
 					currPosDist = start[enter] - pos;
 				}
 			}
 			currPosDist--;
-			if (!readsCurrList.isEmpty())
+
+//			如果不为空，进行下面操作。容器中有序列
+			if(!readsCurrList.isEmpty())
 			{
-				ArrayList<Integer> listPBWT = new ArrayList<Integer>();
+				ArrayList<Integer> listPbwt = new ArrayList<Integer>();
 				ArrayList<String> exception = new ArrayList<String>();
 				ArrayList<Character> exceptionQual = new ArrayList<Character>();
-				// ArrayList<Character> listPbwtQual = new ArrayList<Character>();
-				// ArrayList<ArrayList<String>> exceptionList = new
-				// ArrayList<ArrayList<String>>();
-				// ArrayList<ArrayList<String>> exceptionListQual = new
-				// ArrayList<ArrayList<String>>();
-				for (int i = 0; i < readsCurrList.size(); i++)
+				ArrayList<Integer> index = new ArrayList<>();
+				
+				// 初始化操作，可能会出现多次初始化的情况
+				if(emptyFlag == true)
 				{
-					// 一条read上的相对位置，从0开始到最后length-1
-					int curVal = readsCurrList.get(i).getReads().get(pos - readsCurrList.get(i).getStartAlignment());
-					char curValQual = 0; // 这里初值设置为0非常重要，应对是3的情况
-					if (curVal == 1 || curVal == 0)
+					// 在这里进行初值化操作我认为比较合适
+					// 读取此时容器长度，然后依次遍历，将a0赋值
+					ArrayList<Integer> a0 = new ArrayList<>();
+					for(int i=0 ;i <readsCurrList.size(); i++)
 					{
-						curValQual = readsCurrList.get(i).getReadQuality()
-								.charAt(pos - readsCurrList.get(i).getStartAlignment());
+						a0.add(i);
 					}
-					// 处理第一列，就是之前并没有碱基的情况
-					if (readsCurrList.get(i).getStartAlignment() == pos)
-					{
-						if (curVal == 0)
-						{
-							qualA.add(curValQual);
-						} else
-						{
-							exception.add(readsCurrList.get(i).getException().get(0));
-							exBackUp.add(readsCurrList.get(i).getException().get(0));
-							readsCurrList.get(i).getException().remove(0);
-							// qualB.add(curValQual);
-							exceptionQual.add(curValQual);
-							exListLength++;
-						}
-						c.add(curVal);
-						// qualC.add(curValQual);
-					} else
-					{
-						int preVal = readsCurrList.get(i).getReads()
-								.get(pos - readsCurrList.get(i).getStartAlignment() - 1);
-						if (preVal == 0)
-						{
-							// 这样的话0,1,3三种情况都有了
-							// 如果是3的话没有质量分数，说明横着看read已经结束了，所以做法就是删除该read
-							// 如果是0的话将质量分数加入到A中，
-							// 如果是1的话需要将异常值和异常信息放到一个特殊的容器中，这样这两个信息就相当于提前了
-							// 暂时不要这部分，采用另一种策略详见12.16
-							if (curVal == ReadElemEnum.END.ordinal())
-							{
-								removeIndex.add(i);
-							} else if (curVal == 0)
-							{
-								qualA.add(curValQual);
-							} else
-							{
-								// ArrayList<String> exception = new ArrayList<String>();
-								exception.add(readsCurrList.get(i).getException().get(0));
-								exBackUp.add(readsCurrList.get(i).getException().get(0));
-								readsCurrList.get(i).getException().remove(0);
-								// qualB.add(curValQual);
-								exceptionQual.add(curValQual);
-								exListLength++;
-
-							}
-							a.add(curVal); // crazy:这里注意一下当为结束符号3的时候同样也会加入到其中
-							// qualA.add(curValQual);
-
-						} else if (preVal == 1)
-						{
-							if (curVal == ReadElemEnum.END.ordinal())
-							{
-								removeIndex.add(i);
-							} else if (curVal == 0)
-							{
-								qualA.add(curValQual);
-							} else
-							{
-								// ArrayList<String> exception = new ArrayList<String>();
-								exception.add(readsCurrList.get(i).getException().get(0));
-								exBackUp.add(readsCurrList.get(i).getException().get(0));
-								readsCurrList.get(i).getException().remove(0);
-								// qualB.add(curValQual);
-								exceptionQual.add(curValQual);
-								exListLength++;
-							}
-							b.add(curVal);
-							// qualB.add(curValQual);
-							// 这里加入异常信息,一个位点的位置,就算是一个异常信息了
-							// ArrayList<String> exception = new ArrayList<String>();
-							// //liyang：当前点位是0,前一个点位是1,但是却要把当前点位的东西加入
-							// ArrayList<ArrayList<String>> exceptionList = new
-							// ArrayList<ArrayList<String>>();
-							// ArrayList<ArrayList<String>> exceptionListQual = new
-							// ArrayList<ArrayList<String>>();
-							// System.out.println("startAlignment\t"+readsCurrList.get(i).getStartAlignment()+"\tException
-							// size:\t"+readsCurrList.get(i).getException().size());
-							// 如果是空就会报错
-							// exception.add(readsCurrList.get(i).getException().get(0));
-							// exceptionList.add(exception);
-							// 这里也把质量数也加入进去
-							// ArrayList<String> exceptionQual = new ArrayList<String>();
-							// exceptionQual.add(readsCurrList.get(i).getExceptionQuality().get(0));
-							// exceptionListQual.add(exceptionQual);
-							// readsCurrList.get(i).getException().remove(0);
-							// readsCurrList.get(i).getExceptionQuality().remove(0);
-						} else
-						{
-							System.out.println("Invalid ELSE readsCurrList process..");
-						}
-					}
+					indexes.add(a0);
 				}
+				// 应对插入更新问题
+				// 如果进行之前的初始化操作，这个if不会进入。
+				int maxSize = indexes.size()-1;	
+				int maxValue = indexes.get(maxSize).size()-1;
+				int difference = readsCurrList.size()-indexes.get(maxSize).size();
+				if (emptyFlag == false && difference > 0)
+				{
+					// 更新ak数组
+					for(int i=0; i<difference; i++)
+					{
+						maxValue+=1;
+						indexes.get(maxSize).add(maxValue);
+					}
+					
+				}
+				
+				emptyFlag = false;	// 只有第一次为空进这个循环才会执行这个操作，其他时候不进入
+				char curValQual = ' ';
+				int curValue = -1;
+				int curIndex = -1;
+				// 构造ak+1和k位点的dpbwt
+				for (int i = 0; i < readsCurrList.size(); i++)
+				{	
+					// 一条read上的相对位置，从0开始到最后length-1
+//					curVal = readsCurrList.get(i).getReads().get(pos - readsCurrList.get(i).getStartAlignment());
+					curValQual = 0; // 这里初值设置为0非常重要，应对是3的情况
+					
+					curIndex = indexes.get(indexes.size() - 1).get(i);
+					curValue = readsCurrList.get(curIndex).getReads()
+							.get(pos - readsCurrList.get(curIndex).getStartAlignment());
+					
+					if (curValue == 1 || curValue == 0)
+					{
+						curValQual = readsCurrList.get(curIndex).getReadQuality()
+								.charAt(pos - readsCurrList.get(curIndex).getStartAlignment());
+					}
+					
+					if (curValue == 0)
+					{
+						A.add(curIndex);
+						qualA.add(curValQual);
+						
+						listPbwt.add(curValue);
+					}
+					else if (curValue == 1)
+					{
+						B.add(curIndex);
+						listPbwt.add(curValue);
+//						System.out.println(pos);
+						exception.add(readsCurrList.get(curIndex).getException().get(0));
+						exBackUp.add(readsCurrList.get(curIndex).getException().get(0));
+						readsCurrList.get(curIndex).getException().remove(0);
+						exceptionQual.add(curValQual);
+						exListLength++;
+					}
+					else
+					{
+						C.add(curIndex);
+						listPbwt.add(ReadElemEnum.END.ordinal());
+					}
+					
+				}
+
+				for (Integer ins : A)
+				{
+					index.add(ins);
+				}
+				for (Integer ins : B)
+				{
+					index.add(ins);
+				}
+				
 				// 异常值加入
 				exceptionList.add(exception);
 				// read序列加入
-				for (Integer ins : a)
-				{
-					listPBWT.add(ins);
-				}
-				for (Integer ins : b)
-				{
-					listPBWT.add(ins);
-				}
-				for (Integer ins : c)
-				{
-					listPBWT.add(ins);
-				}
-				listsPBWT.add(listPBWT);
-
+				listsPBWT.add(listPbwt);
+				// 正常质量分数加入
 				// 这里应该先是稀疏化处理，然后才是均质化处理，
 				// 这里丢给质量分数处理函数，处理。应该是单步在这里进行完成的
 				int avg = 0;
@@ -2136,37 +2300,579 @@ public class MainEncoding2
 					listsPbwtQual.add((char) (avg / qualA.size()));
 						
 				}
-				// for(Character chr : qualA){
-				// if(qualA.size() == 0){
-				// listPbwtQual.add(chr);
-				// }else{
-				// char chT= (char)(avg/qualA.size()); //liyang：将数字转换为了字符
-				// listPbwtQual.add(chT);
-				// }
-				// }
-				// 异常质量分数
+				// 异常质量分数加入
 				exceptionListQual.add(exceptionQual);
-				// for(Character chr : qualB){
-				// listPbwtQual.add(chr);
-				// }
-				// for(Character chr : qualC){
-				// listPbwtQual.add(chr);
-				// }
+
 				a.clear();
 				b.clear();
 				c.clear();
+				A.clear();
+				B.clear();
+//				C.clear();
 				qualA.clear();
-				// qualB.clear();
-				// qualC.clear();
-
 				// 这里是一个移除操作，因为每次都要删除第一个，所以需要不断的偏移求相对位置
+				// 这里改一下，删除更新，更新ak+1这个数组
 				int offset = 0;
-				for (Integer ins : removeIndex)
+				int tempIndex = -1;
+				Collections.sort(C);
+				for (Integer ins : C)
 				{
-					readsCurrList.remove(ins - offset);
+					readsCurrList.remove(ins - offset); // 删除序列
+					for (int i = 0; i < index.size(); i++)
+					{
+						if ((ins - offset) <= index.get(i))
+						{
+							tempIndex = index.get(i) - 1;
+							index.set(i, tempIndex);
+						}
+						// else if(ins == index.get(i))
+						// {
+						// index.remove(i);
+						// i--;
+						// }
+						else
+						{
+							// 什么也不做
+						}
+					}
 					offset++;
 				}
-				removeIndex.clear();
+				C.clear();
+				indexes.add(index);
+			}
+			// 这里需要补全代码
+			result.setListsPBWT(listsPBWT);
+			result.setListsExcep(exceptionList);
+			result.setListExQual(exceptionListQual);
+			result.setListsQual(listsPbwtQual);
+			
+			readsQualLength++;
+
+		}
+		tempIndexes = indexes;	// 先这样最简单化处理
+		result.setIndexes(indexes); // indexes应该单独加入，因为之后修改不会全部保存
+//		System.out.println("listsPBWT size:"+result.getListsPBWT().size());
+		System.out.println("\n"+"pos:"+(pos-start[0]));
+		System.out.println();
+		System.out.println("Original PBWT(pbwtResult.length):\t");
+		// for(int i=0; i<listsPBWT.size(); i++)
+		// {
+		// System.out.println(listsPBWT.get(i).toString());
+		// }
+
+		return result;
+	}
+	
+	/**
+	 * 用于局部解压缩，引入gap为2的情况
+	 * @param readsList
+	 * @param start
+	 * @param end
+	 * @return
+	 */
+	private ReadPbwtResult PBWTAlgo3(ArrayList<ReadStruct> readsList, Integer[] start, Integer[] end)
+	{
+		ArrayList<Integer> a = new ArrayList<Integer>(); // 存储为0的值
+		ArrayList<Integer> b = new ArrayList<Integer>(); // 存储为1的值
+		ArrayList<Integer> c = new ArrayList<Integer>(); // 存储新加入的值，在这里，就是ReadElemEnum.START部分 liyang:应该是存储3
+		
+		// 用于构建ak数组
+		ArrayList<Integer> A = new ArrayList<Integer>();
+		ArrayList<Integer> B = new ArrayList<Integer>();
+		ArrayList<Integer> C = new ArrayList<Integer>();
+		ArrayList<Character> qualA = new ArrayList<Character>();
+
+		ArrayList<ArrayList<Integer>> listsPBWT = new ArrayList<ArrayList<Integer>>();
+		ArrayList<Character> listsPbwtQual = new ArrayList<Character>();
+		ArrayList<ArrayList<String>> exceptionList = new ArrayList<ArrayList<String>>();
+		ArrayList<ArrayList<Character>> exceptionListQual = new ArrayList<ArrayList<Character>>();
+
+		ArrayList<ArrayList<Integer>> indexes = new ArrayList<>();	// 用于存储所有的ak
+		
+		ArrayList<ReadStruct> readsCurrList = new ArrayList<ReadStruct>();
+		ReadPbwtResult result = new ReadPbwtResult();
+
+		// 检测一下是否正常排序
+		int endindex = 0;
+		for (int i = 0; i < start.length; i++)
+		{
+			if (i > 1 && start[i] < start[i - 1])
+			{
+				System.out.println("It doesn't sort by start");
+				System.exit(0);
+			}
+			if (end[i] > end[endindex])
+			{
+				endindex = i;
+			}
+		}
+
+		int enter = 0, currPosDist = 0;
+		int readsIndex = 0;
+//		int endindex = end.length - 1;
+//		int tmp = -1;
+		// 这是为了防止，最后一个reads由于不等长的原因导致其并非是最后的坐标，但是这样遍历一遍是不可行的（我认为）
+		// 这里可以并入检查是否对其，我们同时记录最大结束位置就行
+//		for (int i = end.length - 1; i >= 0; i--)
+//		{
+//			if (end[i] >= tmp)
+//			{
+//				tmp = end[i];
+//				endindex = i;
+//			}
+//		}
+
+		// 真正的pbwt处理过程，位置信息是从1开始的，所以说不可能是0
+		int pos = 0;
+		boolean emptyFlag = true;	// 用于监测collection是非为空
+		for (pos = start[0]; pos <= end[endindex]; pos++)
+		{
+			// 这了不明白，为什么不能够等于0呢，为什么需要这么处理呢
+			if (pos == 0)
+			{
+				pos = start[++enter] - 1;
+				continue;
+			}
+
+//			这里的目的就是为了初始化ak数组，这个顺序不能改
+			if(readsCurrList.isEmpty())
+			{
+				emptyFlag = true;
+			}
+			if (currPosDist == 0) // liyang：这里是每条新的序列才能够进行的，只有currposdist减到0,才能加入下一条序列
+			{
+				while (enter < end.length && start[enter] == pos) // 有新元素进队列的情形 liyang：这里这个设计非常的完美pos一直加，而currposdist一直减
+				{
+					readsCurrList.add(readsList.get(readsIndex++)); // liyang:序列从横向的排列变成了纵向的排列，把所有的开头位置一样的先存储一下
+					enter++;
+				}					
+				if (enter < end.length)
+				{
+					currPosDist = start[enter] - pos;
+				}
+			}
+			currPosDist--;
+
+//			如果不为空，进行下面操作。容器中有序列
+			ArrayList<Integer> listPbwt = new ArrayList<Integer>();
+			ArrayList<String> exception = new ArrayList<String>();
+			ArrayList<Character> exceptionQual = new ArrayList<Character>();
+			ArrayList<Integer> index = new ArrayList<>();
+			if(!readsCurrList.isEmpty())
+			{				
+				// 初始化操作，可能会出现多次初始化的情况
+				if(emptyFlag == true)
+				{
+					// 在这里进行初值化操作我认为比较合适
+					// 读取此时容器长度，然后依次遍历，将a0赋值
+					ArrayList<Integer> a0 = new ArrayList<>();
+					for(int i=0 ;i <readsCurrList.size(); i++)
+					{
+						a0.add(i);
+					}
+					indexes.add(a0);
+				}
+				// 应对插入更新问题
+				// 如果进行之前的初始化操作，这个if不会进入。
+				int maxSize = indexes.size()-1;	
+				int maxValue = indexes.get(maxSize).size()-1;
+				int difference = readsCurrList.size()-indexes.get(maxSize).size();
+				if (emptyFlag == false && difference > 0)
+				{
+					// 更新ak数组
+					for(int i=0; i<difference; i++)
+					{
+						maxValue+=1;
+						indexes.get(maxSize).add(maxValue);
+					}
+					
+				}
+				
+				emptyFlag = false;	// 只有第一次为空进这个循环才会执行这个操作，其他时候不进入
+				char curValQual = ' ';
+				int curValue = -1;
+				int curIndex = -1;
+				// 构造ak+1和k位点的dpbwt
+				for (int i = 0; i < readsCurrList.size(); i++)
+				{	
+					// 一条read上的相对位置，从0开始到最后length-1
+//					curVal = readsCurrList.get(i).getReads().get(pos - readsCurrList.get(i).getStartAlignment());
+					curValQual = 0; // 这里初值设置为0非常重要，应对是3的情况
+					
+					curIndex = indexes.get(indexes.size() - 1).get(i);
+					curValue = readsCurrList.get(curIndex).getReads()
+							.get(pos - readsCurrList.get(curIndex).getStartAlignment());
+					
+					if (curValue == 1 || curValue == 0)
+					{
+						curValQual = readsCurrList.get(curIndex).getReadQuality()
+								.charAt(pos - readsCurrList.get(curIndex).getStartAlignment());
+					}
+					
+					if (curValue == 0)
+					{
+						A.add(curIndex);
+						qualA.add(curValQual);
+						
+						listPbwt.add(curValue);
+					}
+					else if (curValue == 1)
+					{
+						B.add(curIndex);
+						listPbwt.add(curValue);
+//						System.out.println(pos);
+						exception.add(readsCurrList.get(curIndex).getException().get(0));
+						exBackUp.add(readsCurrList.get(curIndex).getException().get(0));
+						readsCurrList.get(curIndex).getException().remove(0);
+						exceptionQual.add(curValQual);
+						exListLength++;
+					}
+					else
+					{
+						C.add(curIndex);
+						listPbwt.add(ReadElemEnum.END.ordinal());
+					}
+					
+				}
+
+				for (Integer ins : A)
+				{
+					index.add(ins);
+				}
+				for (Integer ins : B)
+				{
+					index.add(ins);
+				}
+				
+				// 异常值加入
+				exceptionList.add(exception);
+				// read序列加入
+				listsPBWT.add(listPbwt);
+				// 正常质量分数加入
+				// 这里应该先是稀疏化处理，然后才是均质化处理，
+				// 这里丢给质量分数处理函数，处理。应该是单步在这里进行完成的
+				int avg = 0;
+				for (Character chr : qualA)
+				{
+					avg += chr;
+				}
+				// 这里注意，如果是大小为0的话，也需要加上一个0，站住这个位置
+				if (qualA.size() == 0)
+				{
+					listsPbwtQual.add(null); // 这里设置null
+				} else
+				{
+					listsPbwtQual.add((char) (avg / qualA.size()));
+						
+				}
+				// 异常质量分数加入
+				exceptionListQual.add(exceptionQual);
+
+				a.clear();
+				b.clear();
+				c.clear();
+				A.clear();
+				B.clear();
+//				C.clear();
+				qualA.clear();
+				// 这里是一个移除操作，因为每次都要删除第一个，所以需要不断的偏移求相对位置
+				// 这里改一下，删除更新，更新ak+1这个数组
+				int offset = 0;
+				int tempIndex = -1;
+				Collections.sort(C);
+				for (Integer ins : C)
+				{
+					readsCurrList.remove(ins - offset); // 删除序列
+					for (int i = 0; i < index.size(); i++)
+					{
+						if ((ins - offset) <= index.get(i))
+						{
+							tempIndex = index.get(i) - 1;
+							index.set(i, tempIndex);
+						}
+						// else if(ins == index.get(i))
+						// {
+						// index.remove(i);
+						// i--;
+						// }
+						else
+						{
+							// 什么也不做
+						}
+					}
+					offset++;
+				}
+				C.clear();
+				if(!index.isEmpty())
+				{
+					indexes.add(index);
+				}
+				
+			}
+			// 这里添加出现gap的情况,异常值，异常分数都是空，但是正常质量分数这里需要设置为null
+			else
+			{
+//				listPbwt.add(2);
+				indexes.add(index);
+				listsPBWT.add(listPbwt);
+				listsPbwtQual.add(null);
+				exceptionListQual.add(exceptionQual);
+				exceptionList.add(exception);
+				
+			}
+			// 这里需要补全代码
+			result.setListsPBWT(listsPBWT);
+			result.setListsExcep(exceptionList);
+			result.setListExQual(exceptionListQual);
+			result.setListsQual(listsPbwtQual);
+			
+			readsQualLength++;
+
+		}
+		tempIndexes = indexes;	// 先这样最简单化处理
+		result.setIndexes(indexes); // indexes应该单独加入，因为之后修改不会全部保存
+//		System.out.println("listsPBWT size:"+result.getListsPBWT().size());
+		System.out.println("\n"+"pos:"+(pos-start[0]));
+		System.out.println();
+		System.out.println("Original PBWT(pbwtResult.length):\t");
+		// for(int i=0; i<listsPBWT.size(); i++)
+		// {
+		// System.out.println(listsPBWT.get(i).toString());
+		// }
+
+		return result;
+	}
+
+	
+	private ReadPbwtResult PBWTAlgo(ArrayList<ReadStruct> readsList, int[] start, int[] end)
+	{
+		ArrayList<Integer> a = new ArrayList<Integer>(); // 存储为0的值
+		ArrayList<Integer> b = new ArrayList<Integer>(); // 存储为1的值
+		ArrayList<Integer> c = new ArrayList<Integer>(); // 存储新加入的值，在这里，就是ReadElemEnum.START部分 liyang:应该是存储3
+		
+		// 用于构建ak数组
+		ArrayList<Integer> A = new ArrayList<Integer>();
+		ArrayList<Integer> B = new ArrayList<Integer>();
+		ArrayList<Integer> C = new ArrayList<Integer>();
+		ArrayList<Character> qualA = new ArrayList<Character>();
+
+		ArrayList<ArrayList<Integer>> listsPBWT = new ArrayList<ArrayList<Integer>>();
+		ArrayList<Character> listsPbwtQual = new ArrayList<Character>();
+		ArrayList<ArrayList<String>> exceptionList = new ArrayList<ArrayList<String>>();
+		ArrayList<ArrayList<Character>> exceptionListQual = new ArrayList<ArrayList<Character>>();
+
+		ArrayList<ArrayList<Integer>> indexes = new ArrayList<>();	// 用于存储所有的ak
+		
+		ArrayList<ReadStruct> readsCurrList = new ArrayList<ReadStruct>();
+		ReadPbwtResult result = new ReadPbwtResult();
+
+		// 检测一下是否正常排序
+		for (int i = 0; i < start.length; i++)
+		{
+			if (i > 1 && start[i] < start[i - 1])
+			{
+				System.out.println("It doesn't sort by start");
+				System.exit(0);
+			}
+		}
+
+		int enter = 0, currPosDist = 0;
+		int readsIndex = 0;
+		int endindex = end.length - 1;
+		int tmp = -1;
+		// 这是为了防止，最后一个reads由于不等长的原因导致其并非是最后的坐标，但是这样遍历一遍是不可行的（我认为）
+		for (int i = end.length - 1; i >= 0; i--)
+		{
+			if (end[i] >= tmp)
+			{
+				tmp = end[i];
+				endindex = i;
+			}
+		}
+
+		// 真正的pbwt处理过程，位置信息是从1开始的，所以说不可能是0
+		int pos = 0;
+		boolean emptyFlag = true;	// 用于监测collection是非为空
+		for (pos = start[0]; pos <= end[endindex] + 1; pos++)
+		{
+			// 这了不明白，为什么不能够等于0呢，为什么需要这么处理呢
+			if (pos == 0)
+			{
+				pos = start[++enter] - 1;
+				continue;
+			}
+
+//			这里的目的就是为了初始化ak数组，这个顺序不能改
+			if(readsCurrList.isEmpty())
+			{
+				emptyFlag = true;
+			}
+			if (currPosDist == 0) // liyang：这里是每条新的序列才能够进行的，只有currposdist减到0,才能加入下一条序列
+			{
+				while (enter < end.length && start[enter] == pos) // 有新元素进队列的情形 liyang：这里这个设计非常的完美pos一直加，而currposdist一直减
+				{
+					readsCurrList.add(readsList.get(readsIndex++)); // liyang:序列从横向的排列变成了纵向的排列，把所有的开头位置一样的先存储一下
+					enter++;
+				}					
+				if (enter < end.length)
+				{
+					currPosDist = start[enter] - pos;
+				}
+			}
+			currPosDist--;
+
+//			如果不为空，进行下面操作。容器中有序列
+			if(!readsCurrList.isEmpty())
+			{
+				ArrayList<Integer> listPbwt = new ArrayList<Integer>();
+				ArrayList<String> exception = new ArrayList<String>();
+				ArrayList<Character> exceptionQual = new ArrayList<Character>();
+				ArrayList<Integer> index = new ArrayList<>();
+				
+				// 初始化操作，可能会出现多次初始化的情况
+				if(emptyFlag == true)
+				{
+					// 在这里进行初值化操作我认为比较合适
+					// 读取此时容器长度，然后依次遍历，将a0赋值
+					ArrayList<Integer> a0 = new ArrayList<>();
+					for(int i=0 ;i <readsCurrList.size(); i++)
+					{
+						a0.add(i);
+					}
+					indexes.add(a0);
+				}
+				// 应对插入更新问题
+				// 如果进行之前的初始化操作，这个if不会进入。
+				int maxSize = indexes.size()-1;	
+				int maxValue = indexes.get(maxSize).size()-1;
+				int difference = readsCurrList.size()-indexes.get(maxSize).size();
+				if (emptyFlag == false && difference > 0)
+				{
+					// 更新ak数组
+					for(int i=0; i<difference; i++)
+					{
+						maxValue+=1;
+						indexes.get(maxSize).add(maxValue);
+					}
+					
+				}
+				
+				emptyFlag = false;	// 只有第一次为空进这个循环才会执行这个操作，其他时候不进入
+				int curVal = -1;
+				char curValQual = ' ';
+				int curValue = -1;
+				int curIndex = -1;
+				// 构造ak+1和k位点的dpbwt
+				for (int i = 0; i < readsCurrList.size(); i++)
+				{	
+					// 一条read上的相对位置，从0开始到最后length-1
+//					curVal = readsCurrList.get(i).getReads().get(pos - readsCurrList.get(i).getStartAlignment());
+					curValQual = 0; // 这里初值设置为0非常重要，应对是3的情况
+					
+					curIndex = indexes.get(indexes.size() - 1).get(i);
+					curValue = readsCurrList.get(curIndex).getReads()
+							.get(pos - readsCurrList.get(i).getStartAlignment());
+					
+					if (curValue == 1 || curVal == 0)
+					{
+						curValQual = readsCurrList.get(curIndex).getReadQuality()
+								.charAt(pos - readsCurrList.get(i).getStartAlignment());
+					}
+					
+					if (curValue == 0)
+					{
+						A.add(curIndex);
+						qualA.add(curValQual);
+						
+						listPbwt.add(curValue);
+					}
+					else if (curValue == 1)
+					{
+						B.add(curIndex);
+						listPbwt.add(curValue);
+						
+						exception.add(readsCurrList.get(curIndex).getException().get(0));
+						exBackUp.add(readsCurrList.get(curIndex).getException().get(0));
+						readsCurrList.get(curIndex).getException().remove(0);
+						exceptionQual.add(curValQual);
+						exListLength++;
+					}
+					else
+					{
+						C.add(curIndex);
+						listPbwt.add(ReadElemEnum.END.ordinal());
+					}
+					
+					for (Integer ins : A)
+					{
+						index.add(ins);
+					}
+					for (Integer ins : B)
+					{
+						index.add(ins);
+					}
+				}
+
+				// 异常值加入
+				exceptionList.add(exception);
+				// read序列加入
+				listsPBWT.add(listPbwt);
+				// 正常质量分数加入
+				// 这里应该先是稀疏化处理，然后才是均质化处理，
+				// 这里丢给质量分数处理函数，处理。应该是单步在这里进行完成的
+				int avg = 0;
+				for (Character chr : qualA)
+				{
+					avg += chr;
+				}
+				// 这里注意，如果是大小为0的话，也需要加上一个0，站住这个位置
+				if (qualA.size() == 0)
+				{
+					listsPbwtQual.add(null);
+				} else
+				{
+					listsPbwtQual.add((char) (avg / qualA.size()));
+						
+				}
+				// 异常质量分数加入
+				exceptionListQual.add(exceptionQual);
+
+				a.clear();
+				b.clear();
+				c.clear();
+				A.clear();
+				B.clear();
+				C.clear();
+				qualA.clear();
+				// 这里是一个移除操作，因为每次都要删除第一个，所以需要不断的偏移求相对位置
+				// 这里改一下，删除更新，更新ak+1这个数组
+				int offset = 0;
+				int tempIndex = -1;
+				Collections.sort(C);
+				for (Integer ins : C)
+				{
+					readsCurrList.remove(ins - offset);	// 删除序列
+					for(int i=0 ;i<index.size() ;i++)
+					{
+						if (ins < index.get(i))
+						{
+							tempIndex = index.get(i) - 1;
+							index.set(i, tempIndex);
+						}
+						else if(ins == index.get(i))
+						{
+							index.remove(i);
+							i--;
+						}
+						else
+						{
+							// 什么也不做
+						}
+					}
+					offset++;
+				}
+				C.clear();
+				indexes.add(index);
 			}
 			// 这里需要补全代码
 			result.setListsPBWT(listsPBWT);
@@ -2732,88 +3438,10 @@ public class MainEncoding2
 
 	/**
 	 * 针对按照序列解压缩的异常值解压缩
-	 * 
+	 * 最大化压缩
 	 * @param vE
 	 * @return
 	 */
-	public static byte[] EncodeExceptionList2(ArrayList<ArrayList<String>> vE)
-	{
-		ArrayList<ArrayList<String>> exceptionList = vE;
-		Huffman2 huffman = new Huffman2();
-		String rateText = "AAACCCTTTGGG||,,DN";
-		huffman.handleRate(rateText);
-		StringBuilder rawText = new StringBuilder();
-		for (ArrayList<String> str : exceptionList)
-		{
-			if (str.isEmpty())
-			{
-				rawText.append("|");
-			} else if (str.size() == 1)
-			{
-				rawText.append(str.get(0) + "|");
-			} else
-			{
-				int i = 0;
-				while (i < str.size() - 1)
-				{
-					rawText.append(str.get(i) + ",");
-					i++;
-				}
-				rawText.append(str.get(i) + "|");
-			}
-		}
-		String[] str = Huffman2.encodeText2(rawText.toString());
-
-		int length = 0; // crazy:用于记录str真正的长度；
-		for (int i = 0; i < str.length; i++)
-		{
-			System.out.println(str[i]);
-			if (str[i] == "")
-			{
-				length = i;
-				break;
-			}
-			length = i + 1;
-		}
-		// System.out.println();
-		// System.out.println("length : "+length);
-//		for (ArrayList<String> ar : exceptionList)
-//		{
-//			for (String str1 : ar)
-//			{
-//				System.out.print(str1 + "  ");
-//			}
-//			System.out.println();
-//		}
-//		System.out.println();
-		// System.out.println(length);
-
-		ByteBuffer bytes = ByteBuffer.allocate(length * 2); // liyang:开辟双倍内存，short占用两个字节
-		for (int i = 0; i < length - 1; i++)
-		{
-			// System.out.println("bytes.postiton:\t"+bytes.position());
-			bytes.putShort((short) (Integer.parseInt(str[i], 2)));
-		}
-		// 最后一个位置再拼凑一下然后放进去
-		// System.out.println(str[length-1].length());
-		// ××××××××××××××××××××××××××××××××加上1没问题，但是你要怎么还原回去呢××××××××××××××××××××××××××××××××××××××××××
-		String strTemp = str[length - 1];
-		if (strTemp.length() < 16)
-		{
-			for (int num = 16 - strTemp.length(); num > 0; num--)
-			{
-				strTemp += "1";
-			}
-		} else
-		{
-
-		}
-		bytes.putShort((short) (Integer.parseInt(strTemp, 2)));
-		byte[] array = bytes.array();
-		System.out.println("the compression of ex has completed ");
-		return array;
-	}
-
 	public static byte[] EncodeExceptionList(ArrayList<ArrayList<String>> vE)
 	{
 		ArrayList<ArrayList<String>> exceptionList = vE;
@@ -2881,6 +3509,146 @@ public class MainEncoding2
 		return array;
 	}
 
+	public static byte[] EncodeExceptionList2(ArrayList<ArrayList<String>> vE)
+	{
+		ArrayList<ArrayList<String>> exceptionList = vE;
+		Huffman2 huffman = new Huffman2();
+		String rateText = "AAACCCTTTGGG||DN";
+		huffman.handleRate(rateText);
+		StringBuilder rawText = new StringBuilder();
+		for (ArrayList<String> str : exceptionList)
+		{
+			for (int i = 0; i < str.size(); i++)
+			{
+				rawText.append(str.get(i) + "|");
+			}
+		}
+		String[] str = Huffman2.encodeText2(rawText.toString());
+
+		int length = 0; // crazy:用于记录str真正的长度；
+		for (int i = 0; i < str.length; i++)
+		{
+//			System.out.println(str[i]);
+			if (str[i] == "")
+			{
+				length = i;
+				break;
+			}
+			length = i + 1;
+		}
+//		System.out.println("huffman length \t" + length);
+		// System.out.println();
+		// System.out.println("length : "+length);
+//		for (ArrayList<String> ar : exceptionList)
+//		{
+//			for (String str1 : ar)
+//			{
+//				System.out.print(str1 + "  ");
+//			}
+//			System.out.println();
+//		}
+//		System.out.println();
+		// System.out.println(length);
+
+		ByteBuffer bytes = ByteBuffer.allocate(length * 2); // liyang:开辟双倍内存，short占用两个字节
+		for (int i = 0; i < length - 1; i++)
+		{
+			// System.out.println("bytes.postiton:\t"+bytes.position());
+			bytes.putShort((short) (Integer.parseInt(str[i], 2)));
+		}
+		// 最后一个位置再拼凑一下然后放进去
+		// System.out.println(str[length-1].length());
+		// ××××××××××××××××××××××××××××××××加上1没问题，但是你要怎么还原回去呢××××××××××××××××××××××××××××××××××××××××××
+		String strTemp = str[length - 1];
+		if (strTemp.length() < 16)
+		{
+			for (int num = 16 - strTemp.length(); num > 0; num--)
+			{
+				strTemp += "1";
+			}
+		} else
+		{
+
+		}
+		bytes.putShort((short) (Integer.parseInt(strTemp, 2)));
+		byte[] array = bytes.array();
+		System.out.println("the compression of ex has completed ");
+		return array;
+	}
+
+/**
+ * 适用于插入压缩，引入符号‘，’进行内部区分，空的位置加上‘|’
+ * @param vE
+ * @return
+ */
+	public static byte[] EncodeExceptionList3(ArrayList<ArrayList<String>> vE)
+	{
+		ArrayList<ArrayList<String>> exceptionList = vE;
+		Huffman2 huffman = new Huffman2();
+		String rateText = "AAACCCTTTGGG||,,DN";
+		huffman.handleRate(rateText);
+		StringBuilder rawText = new StringBuilder();
+		for (ArrayList<String> str : exceptionList)
+		{
+			if (str.isEmpty())
+			{
+				rawText.append("|");
+			} else if (str.size() == 1)
+			{
+				rawText.append(str.get(0) + "|");
+			} else
+			{
+				int i = 0;
+				while (i < str.size() - 1)
+				{
+					rawText.append(str.get(i) + ",");
+					i++;
+				}
+				rawText.append(str.get(i) + "|");
+			}
+		}
+		String[] str = Huffman2.encodeText2(rawText.toString());
+
+		int length = 0; // crazy:用于记录str真正的长度；
+		for (int i = 0; i < str.length; i++)
+		{
+			System.out.println(str[i]);
+			if (str[i] == "")
+			{
+				length = i;
+				break;
+			}
+			length = i + 1;
+		}
+
+		ByteBuffer bytes = ByteBuffer.allocate(length * 2); // liyang:开辟双倍内存，short占用两个字节
+		for (int i = 0; i < length - 1; i++)
+		{
+			// System.out.println("bytes.postiton:\t"+bytes.position());
+			bytes.putShort((short) (Integer.parseInt(str[i], 2)));
+		}
+		// 最后一个位置再拼凑一下然后放进去
+		// System.out.println(str[length-1].length());
+		// ××××××××××××××××××××××××××××××××加上1没问题，但是你要怎么还原回去呢××××××××××××××××××××××××××××××××××××××××××
+		String strTemp = str[length - 1];
+		if (strTemp.length() < 16)
+		{
+			for (int num = 16 - strTemp.length(); num > 0; num--)
+			{
+				strTemp += "1";
+			}
+		} else
+		{
+
+		}
+		bytes.putShort((short) (Integer.parseInt(strTemp, 2)));
+		byte[] array = bytes.array();
+		System.out.println("the compression of ex has completed ");
+		return array;
+	}
+
+	
+	
 	private String TranforOr(String string)
 	{
 		// 分箱过程的还原过程,写在大循环中可以减少一次遍历

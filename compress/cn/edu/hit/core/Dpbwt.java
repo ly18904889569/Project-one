@@ -46,6 +46,7 @@ public class Dpbwt
 			if (i > 0 && start[i] < start[i - 1])
 			{
 				System.out.println("It doesn't sort by start");
+				System.out.println(i);
 				System.exit(0);
 			}
 		}
