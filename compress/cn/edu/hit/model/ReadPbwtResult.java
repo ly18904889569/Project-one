@@ -7,18 +7,19 @@ public class ReadPbwtResult
 {
 	private ArrayList<ArrayList<Integer>> listsPBWT;
 	
-	private ArrayList<Character> listsQual;
-	
 	private ArrayList<ArrayList<String>> listsExcep;
-	
-	private ArrayList<ArrayList<Character>> listExQual;
 	
 	private List<String> listsExcep2;
 	
+	private ArrayList<Character> listsQual;
+		
+	private ArrayList<ArrayList<Character>> listExQual;
+		
 	private ArrayList<Character> listExQual2;
 	
 	private ArrayList<ArrayList<Integer>> indexes;
 	
+	public ArrayList<Integer> auxInfo;
 	
 	public ArrayList<ArrayList<Integer>> getIndexes()
 	{

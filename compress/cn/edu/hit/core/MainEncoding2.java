@@ -180,10 +180,10 @@ public class MainEncoding2
 
 		reResult.setStartPos(deStartPos(compressRes.getStartResult()));
 
-		reResult.setListsPBWT(DecodePBWT(compressRes.getReadsResult()));
+		reResult.setListsPBWT(DecodeTPBWT(compressRes.getReadsResult()));
 
 //		reResult.setListsExcep2(Arrays.asList(deEncodeExceptionList(compressRes.getExceptionResult())));
-		deEncodeExceptionList2(compressRes.getExceptionResult());
+//		deEncodeExceptionList2(compressRes.getExceptionResult());
 		
 //		reResult.setListsQual(deEncodeQual2(compressRes.getReadQuaReasult()));
 
@@ -890,11 +890,11 @@ public class MainEncoding2
 //		pbwtres = PBWTAlgo2(readsList, start, end);
 		
 //		局部解压缩算法压缩过程
-		pbwtres = PBWTAlgo3(readsList, start, end);
+		pbwtres = PBWTAlgo4(readsList, start, end);
 		
 		
 		
-		ArrayList<ArrayList<Integer>> pbwtResult = pbwtres.getListsPBWT();
+//		ArrayList<ArrayList<Integer>> pbwtResult = pbwtres.getListsPBWT();
 
 		// ArrayList<ArrayList<Integer>> repbwt = PBWTAlgoRe(pbwtResult, start,end); //
 		// 之前需要其实和终止位置
@@ -909,22 +909,23 @@ public class MainEncoding2
 		// ss了，所以说用7个1表示，肯定是比之前好，不连接一样的，如果连上了效果更好。
 		// 如果完全去了3，那么这样效果更好，但是再还原的时候就需要长度信息，不然就无法还原。
 		// 起始位置信息也需要压缩，不然利用参考序列是无法进行还原的
+//		byte[] value2by = binaryValues(values);
 
-		runLen(keys, values, pbwtResult);
-
+//		runLen(keys, values, pbwtResult);
+		runLen(keys, values, pbwtres);
+		byte[] kv = binaryKV(keys, values);
 		// 首先是对value值进行压缩，范围在1B-3B，长度不超过128的为1B，超过128的为3B
-		byte[] value2by = binaryValues(values);
 
 		// 对于key值的压缩4个合成为一个
-		byte[] key2by = binaryKeys(keys);
+//		byte[] key2by = binaryKeys(keys);
 		// 先key在value好一点，因为长度较短。这里有两个方式能够在解压缩的时候将keyAndValue分开。一个是记录key的长度，一个是加上间隔符号
 
-		byte[] keyAndValue = (byte[]) ArrayUtils.addAll(value2by, key2by);
-		System.out.println("keysAndValues size:\t" + keyAndValue.length);
+//		byte[] keyAndValue = (byte[]) ArrayUtils.addAll(value2by, key2by);
+//		System.out.println("keysAndValues size:\t" + keyAndValue.length);
 
-		int len = value2by.length;
-		byte[] len2 = new byte[4];
-		compressLen(len, len2);
+//		int len = value2by.length;
+//		byte[] len2 = new byte[4];
+//		compressLen(len, len2);
 		// int delen = deCompressLen(len2);
 		// if(len == delen)
 		// {
@@ -934,7 +935,7 @@ public class MainEncoding2
 		// {
 		// System.out.println("It's wrong(compress len)");
 		// }
-		keyAndValue = (byte[]) ArrayUtils.addAll(len2, keyAndValue);
+//		keyAndValue = (byte[]) ArrayUtils.addAll(len2, keyAndValue);
 
 		// DecodePbwt(key2by, value2by);
 		// 这里仅仅是2进制还原，并不带有pbwt还原。再去证明一下正确性
@@ -943,10 +944,10 @@ public class MainEncoding2
 		// PbwtIsTrue(pbwtResult,rePBWT);
 
 		// 在这里进行余下的几个部分的压缩工作
-		byte[] exBy = EncodeExceptionList3(pbwtres.getListsExcep());
+		byte[] exBy = EncodeExceptionList4(pbwtres.getListsExcep());
 		// MainEncoding2.deEncodeExceptionList(exBy);
 		// 需要改两处，一个是质量分数都全部认为是char，然后是正常质量分数一列是一个值
-		byte[] exQual = EncodeExceptionQual(pbwtres.getListExQual());
+		byte[] exQual = EncodePbwtSingleQual(pbwtres.getListExQual2());
 		byte[] pbwtQual = EncodePbwtSingleQual(pbwtres.getListsQual());
 		// ArrayList<Character> qual = deEncodeQual2(pbwtQual);
 		// byte[] pbwtQual = MainEncoding2.EncodePbwtQual(pbwtres.getListsQual());
@@ -954,7 +955,7 @@ public class MainEncoding2
 		allRes.setExceptionResult(exBy);
 		allRes.setExceptionQuaResult(exQual);
 		allRes.setReadQuaReasult(pbwtQual);
-		allRes.setReadsResult(keyAndValue);
+		allRes.setReadsResult(kv);
 
 		return allRes;
 	}
@@ -1179,7 +1180,124 @@ public class MainEncoding2
 		System.out.println("values size:\t" + value2by.length);
 		return value2by;
 	}
-
+	/**
+	 * 将keys和values进行合并压缩
+	 * @param values
+	 * @param keys
+	 * @return
+	 */
+	private byte[] binaryKV(List<Integer> keys ,List<Integer> values)
+	{
+		List<Byte> keyValue = new ArrayList<>();
+		int tempKey = -1;
+		int tempValue = -1;
+		int tempByte = -1;
+		int lastkey = -1;
+		for (int i = 0; i < values.size(); i++)
+		{
+			tempKey = keys.get(i);
+			tempValue = values.get(i);
+			// 当key等于2的时候处理比较繁琐，需要将函数再加上额外附加信息
+			if (tempKey == 2)
+			{
+				tempByte = tempKey*64 + tempValue*16 - 128;
+				// 接下来的所有操作都是关于插入信息的操作，前面占用了
+				
+//				if (tempValue == 1)
+//				{
+//					if ( lastkey == 2)
+//					{
+//						// 此时表明该序列为空，只有2
+//						
+//					}
+//					else
+//					{
+//						// 此时表明该序列不为空，为0,1混合
+//						
+//					}
+//				}
+//				else if (tempValue == 2) {
+//					
+//				}
+//				else
+//				{
+//					
+//				}
+				keyValue.add((byte)(tempByte & 0xff));
+			}
+			else
+			{
+				// 当value大于2^5-1，需要设置1并且额外增加一个byte
+				if (tempValue > 31)
+				{
+					tempByte = tempKey*64 + 1*32 + tempValue/256 - 128;
+					keyValue.add((byte) (tempByte & 0xff));
+					tempByte = tempValue % 256 - 128;
+					keyValue.add((byte) (tempByte & 0xff));
+				}
+				// 当value不大于31时，压缩为一个byte，并将标志位设置为0
+				else 
+				{
+					// 这里先不去减128试试看，
+					tempByte = tempKey*64 + 0*32 + tempValue - 128;
+					keyValue.add((byte) (tempByte & 0xff));
+				}
+			}
+			lastkey = tempKey;
+		}
+		ByteBuffer bytes = ByteBuffer.allocate(keyValue.size());
+		for (byte by : keyValue)
+		{
+			bytes.put(by);
+		}
+		byte[] byteKV= bytes.array();
+		return byteKV;
+	}
+	
+	private void DebinaryKV(byte[] byteKV)
+	{
+		int tempByte = 0;
+		int tempByte2 = 0;
+		int value = -1;
+		int key = -1;
+		int lenFlag = -1;
+		for(int i =0; i<byteKV.length; i++)
+		{
+			tempByte = byteKV[i] + 128;
+			key = (tempByte >> 6)%4;
+//			value = tempByte%32;
+			if (key == 2)
+			{
+				value = (tempByte >> 4)%4;
+//				lenFlag = (tempByte >> 3)%2;
+//				if (lenFlag == 1)
+//				{
+//					i++;
+//					tempByte2 = byteKV[i] + 128;
+//				}
+//				else
+//				{
+//					
+//				}
+			}
+			// 当key为0,1,3时候都有可能长度超过31
+			else
+			{
+				lenFlag = (tempByte >> 5)%2;
+				if (lenFlag == 1)
+				{
+					i++;
+					tempByte2 = byteKV[i] + 128;
+					value = tempByte%32*256 + tempByte2; // 这里稍有问题，暂时这样
+				}
+				else 
+				{
+					value = tempByte%32;
+				}
+			}
+		}
+	}
+	
 	private void runLen(List<Integer> keys, List<Integer> values, ArrayList<ArrayList<Integer>> pbwtResult)
 	{
 		int countZero = 0, countOne = 0, countThree = 0;
@@ -1265,6 +1383,117 @@ public class MainEncoding2
 		}
 	}
 
+	/**
+	 * 局部策略
+	 * @param keys
+	 * @param values
+	 * @param pbwtres
+	 */
+	private void runLen(List<Integer> keys, List<Integer> values, ReadPbwtResult pbwtres)
+	{
+		int countZero = 0, countOne = 0, countThree = 0;
+		int preVal = -1;
+		int curVal = -1;
+		boolean oneFlag = false;
+		boolean zeroFlag = false;
+
+		for (ArrayList<Integer> listPbwt : pbwtres.getListsPBWT())
+		{
+			// 当一列并无元素时候，直接加入占位符号2就行
+			if (listPbwt.isEmpty())
+			{
+				keys.add(2);
+				values.add(1);
+			}
+			else 
+			{
+				countZero = 0;
+				countOne = 0;
+				countThree = 0;
+				for (int i = 0; i < listPbwt.size(); i++)
+				{ // liyang:纵向进行
+					curVal = listPbwt.get(i);
+					if (i != 0 && curVal != preVal)
+					{ // 把i为0的起始条件排除掉，因为其实位置之前没有preVal
+						if (preVal == 0)
+						{
+							keys.add(0);
+							values.add(countZero);
+						} else if (preVal == 1)
+						{
+							keys.add(1);
+							values.add(countOne);
+						} else
+						{
+							keys.add(3);
+							values.add(countThree);
+						}
+						// 计数器清零
+						countZero = 0;
+						countOne = 0;
+						countThree = 0;
+
+					}
+
+					preVal = curVal; // liyang:因为是起始位置，这样就会默认计数为1
+					if (curVal == 0)
+					{
+						zeroFlag = true;
+						countZero++;
+					} else if (curVal == 1)
+					{
+						oneFlag = true;
+						countOne++;
+					}else if (curVal == 3)
+					{
+						countThree++;
+					} else
+					{
+						System.out.println("readsRL count Error....");
+					}
+					if (i == listPbwt.size() - 1)
+					{ // liyang：处理最后一个元素，同时也是退出这里垂直编码
+						// 处理到最后一个元素了
+						if (curVal == 0)
+						{
+							keys.add(0);
+							values.add(countZero);
+						} else if (curVal == 1)
+						{
+							keys.add(1);
+							values.add(countOne);
+						} else
+						{
+							keys.add(3);
+							values.add(countThree);
+						}
+						// 同时加入结束的分隔符
+						// 暂作为间隔符使用,在这里不会有2出现，用2来表示单条listpbwt的终止
+						// 需要加上这个2吗，2作为一条listpbwt的终止
+						if (zeroFlag&&oneFlag)
+						{
+							keys.add(2);
+							values.add(1);
+						}
+						else if (zeroFlag&&!oneFlag) 
+						{
+							keys.add(2);
+							values.add(2);
+						}
+						else 
+						{
+							keys.add(2);
+							values.add(3);
+						}
+					}
+				}
+			}
+			oneFlag = false;
+			zeroFlag = false;
+		}
+	}
+
+	
 	private static void compressLen(int len, byte[] len2)
 	{
 		if (len < Math.pow(2, 8))
@@ -1385,6 +1614,72 @@ public class MainEncoding2
 
 	}
 
+	/**
+	 * 局部解压缩策略
+	 * @param byteKV
+	 * @return
+	 */
+	public static ArrayList<ArrayList<Integer>> DecodeTPBWT(byte[] byteKV)
+	{
+		// 首先截取前四位为长度，然后4+长度为value。顺次解压完成之后再去解压key，在解压key的同时完成pbwt的还原工作
+		ArrayList<Integer> bKeys = new ArrayList<Integer>();
+		ArrayList<Integer> bVals = new ArrayList<Integer>();
+
+		ArrayList<ArrayList<Integer>> reList = new ArrayList<ArrayList<Integer>>();
+		ArrayList<ArrayList<Integer>> result = new ArrayList<ArrayList<Integer>>();
+		
+		DebitKV(byteKV, bKeys, bVals);
+		
+		reList = reListPbwt2(bKeys, bVals);
+		
+		// result 这里需要pbwt还原
+		result = PBWTAlgoRe2(reList);
+
+		return result;
+
+	}
+	/**key和value合起来的解压缩算法
+	 * @param byteKV
+	 * @param bKeys
+	 * @param bVals
+	 */
+	private static void DebitKV(byte[] byteKV, ArrayList<Integer> bKeys, ArrayList<Integer> bVals)
+	{
+		int tempByte = 0;
+		int tempByte2 = 0;
+		int value = -1;
+		int key = -1;
+		int lenFlag = -1;
+		
+		for(int i =0; i<byteKV.length; i++)
+		{
+			tempByte = byteKV[i] + 128;
+			key = (tempByte >> 6)%4;
+			if (key == 2)
+			{
+				value = (tempByte >> 4)%4;
+			}
+			// 当key为0,1,3时候都有可能长度超过31
+			else
+			{
+				lenFlag = (tempByte >> 5)%2;
+				if (lenFlag == 1)
+				{
+					i++;
+					tempByte2 = byteKV[i] + 128;
+					value = tempByte%32*256 + tempByte2; // 这里稍有问题，暂时这样
+				}
+				else 
+				{
+					value = tempByte%32;
+				}
+			}
+			bKeys.add(key);
+			bVals.add(value);
+		}
+	}
+
+	
 	private void DecodePbwt(byte[] keys, byte[] values)
 	{
 		// 对于key值进行解压,还原之后的key数量可能会多些，因为有补位
@@ -1450,6 +1745,38 @@ public class MainEncoding2
 		return reListsPBWT;
 	}
 
+	private static ArrayList<ArrayList<Integer>> reListPbwt2(ArrayList<Integer> bKeysFromByte,
+			ArrayList<Integer> bValsFromByte)
+	{
+		ArrayList<ArrayList<Integer>> reListsPBWT = new ArrayList<ArrayList<Integer>>();
+		ArrayList<Integer> pbwt = new ArrayList<Integer>();
+		int num = 0;
+		int keyTemp = 0;
+		for (int i = 0; i < bValsFromByte.size(); i++)
+		{
+			if (bKeysFromByte.get(i) == 2)
+			{
+				reListsPBWT.add(pbwt);
+				pbwt = new ArrayList<Integer>();
+			} else
+			{
+				num = bValsFromByte.get(i);
+				keyTemp = bKeysFromByte.get(i);
+				while (num-- > 0)
+				{
+					pbwt.add(keyTemp);
+				}
+			}
+		}
+
+//		for (ArrayList<Integer> list : reListsPBWT)
+//		{
+//			System.out.println(list.toString());
+//		}
+		return reListsPBWT;
+	}
+
+	
 	public static boolean PbwtIsTrue(ArrayList<ArrayList<Integer>> pbwtResult, ArrayList<ArrayList<Integer>> repbwt)
 	{
 		for (int i = 0; i < pbwtResult.size() && i < repbwt.size(); i++)
@@ -1690,6 +2017,11 @@ public class MainEncoding2
 	}
 
 	// 这里还需要参数ak，改一下函数传进来这个参数。暂时用静态变量进行处理
+	/**
+	 * 适用于全局和局部按照行解压缩
+	 * @param pbwtResult
+	 * @return
+	 */
 	private static ArrayList<ArrayList<Integer>> PBWTAlgoRe2(ArrayList<ArrayList<Integer>> pbwtResult)
 	{
 		PBWTReadRe pbwtReadRe = new PBWTReadRe();
@@ -2643,6 +2975,291 @@ public class MainEncoding2
 		return result;
 	}
 
+	/**
+	 * 局部解压缩，引入gap为2同时异常值变换位置
+	 * @param readsList
+	 * @param start
+	 * @param end
+	 * @return
+	 */
+	private ReadPbwtResult PBWTAlgo4(ArrayList<ReadStruct> readsList, Integer[] start, Integer[] end)
+	{
+		ArrayList<Integer> a = new ArrayList<Integer>(); // 存储为0的值
+		ArrayList<Integer> b = new ArrayList<Integer>(); // 存储为1的值
+		ArrayList<Integer> c = new ArrayList<Integer>(); // 存储新加入的值，在这里，就是ReadElemEnum.START部分 liyang:应该是存储3
+		
+		// 用于构建ak数组
+		ArrayList<Integer> A = new ArrayList<Integer>();
+		ArrayList<Integer> B = new ArrayList<Integer>();
+		ArrayList<Integer> C = new ArrayList<Integer>();
+		ArrayList<Character> qualA = new ArrayList<Character>();
+		ArrayList<Character> qualB = new ArrayList<Character>();
+
+		ArrayList<ArrayList<Integer>> listsPBWT = new ArrayList<ArrayList<Integer>>();
+		ArrayList<Character> listsPbwtQual = new ArrayList<Character>();
+		ArrayList<ArrayList<String>> exceptionList = new ArrayList<ArrayList<String>>();
+//		ArrayList<ArrayList<Character>> exceptionListQual = new ArrayList<ArrayList<Character>>();
+		ArrayList<Character> exceptionQual = new ArrayList<Character>();
+		ArrayList<ArrayList<Integer>> indexes = new ArrayList<>();	// 用于存储所有的ak
+		
+		ArrayList<ReadStruct> readsCurrList = new ArrayList<ReadStruct>();
+		ReadPbwtResult result = new ReadPbwtResult();
+
+		// 检测一下是否正常排序
+		int endindex = 0;
+		for (int i = 0; i < start.length; i++)
+		{
+			if (i > 1 && start[i] < start[i - 1])
+			{
+				System.out.println("It doesn't sort by start");
+				System.exit(0);
+			}
+			if (end[i] > end[endindex])
+			{
+				endindex = i;
+			}
+		}
+
+		int enter = 0, currPosDist = 0;
+		int readsIndex = 0;
+//		int endindex = end.length - 1;
+//		int tmp = -1;
+		// 这是为了防止，最后一个reads由于不等长的原因导致其并非是最后的坐标，但是这样遍历一遍是不可行的（我认为）
+		// 这里可以并入检查是否对其，我们同时记录最大结束位置就行
+//		for (int i = end.length - 1; i >= 0; i--)
+//		{
+//			if (end[i] >= tmp)
+//			{
+//				tmp = end[i];
+//				endindex = i;
+//			}
+//		}
+
+		// 真正的pbwt处理过程，位置信息是从1开始的，所以说不可能是0
+		int pos = 0;
+		boolean emptyFlag = true;	// 用于监测collection是非为空
+		for (pos = start[0]; pos <= end[endindex]; pos++)
+		{
+			// 这了不明白，为什么不能够等于0呢，为什么需要这么处理呢
+			if (pos == 0)
+			{
+				pos = start[++enter] - 1;
+				continue;
+			}
+
+//			这里的目的就是为了初始化ak数组，这个顺序不能改
+			if(readsCurrList.isEmpty())
+			{
+				emptyFlag = true;
+			}
+			if (currPosDist == 0) // liyang：这里是每条新的序列才能够进行的，只有currposdist减到0,才能加入下一条序列
+			{
+				while (enter < end.length && start[enter] == pos) // 有新元素进队列的情形 liyang：这里这个设计非常的完美pos一直加，而currposdist一直减
+				{
+					readsCurrList.add(readsList.get(readsIndex++)); // liyang:序列从横向的排列变成了纵向的排列，把所有的开头位置一样的先存储一下
+					enter++;
+				}					
+				if (enter < end.length)
+				{
+					currPosDist = start[enter] - pos;
+				}
+			}
+			currPosDist--;
+
+//			如果不为空，进行下面操作。容器中有序列
+			ArrayList<Integer> listPbwt = new ArrayList<Integer>();
+			ArrayList<String> exception = new ArrayList<String>();
+			ArrayList<Integer> index = new ArrayList<>();
+			if(!readsCurrList.isEmpty())
+			{				
+				// 初始化操作，可能会出现多次初始化的情况
+				if(emptyFlag == true)
+				{
+					// 在这里进行初值化操作我认为比较合适
+					// 读取此时容器长度，然后依次遍历，将a0赋值
+					ArrayList<Integer> a0 = new ArrayList<>();
+					for(int i=0 ;i <readsCurrList.size(); i++)
+					{
+						a0.add(i);
+					}
+					indexes.add(a0);
+				}
+				// 应对插入更新问题
+				// 如果进行之前的初始化操作，这个if不会进入。
+				int maxSize = indexes.size()-1;	
+				int maxValue = indexes.get(maxSize).size()-1;
+				int difference = readsCurrList.size()-indexes.get(maxSize).size();
+				if (emptyFlag == false && difference > 0)
+				{
+					// 更新ak数组
+					for(int i=0; i<difference; i++)
+					{
+						maxValue+=1;
+						indexes.get(maxSize).add(maxValue);
+					}
+					
+				}
+				
+				emptyFlag = false;	// 只有第一次为空进这个循环才会执行这个操作，其他时候不进入
+				char curValQual = ' ';
+				int curValue = -1;
+				int curIndex = -1;
+				// 构造ak+1和k位点的dpbwt
+				for (int i = 0; i < readsCurrList.size(); i++)
+				{	
+					// 一条read上的相对位置，从0开始到最后length-1
+//					curVal = readsCurrList.get(i).getReads().get(pos - readsCurrList.get(i).getStartAlignment());
+					curValQual = 0; // 这里初值设置为0非常重要，应对是3的情况
+					
+					curIndex = indexes.get(indexes.size() - 1).get(i);
+					curValue = readsCurrList.get(curIndex).getReads()
+							.get(pos - readsCurrList.get(curIndex).getStartAlignment());
+					
+					if (curValue == 1 || curValue == 0)
+					{
+						curValQual = readsCurrList.get(curIndex).getReadQuality()
+								.charAt(pos - readsCurrList.get(curIndex).getStartAlignment());
+					}
+					
+					if (curValue == 0)
+					{
+						A.add(curIndex);
+						qualA.add(curValQual);
+						listPbwt.add(curValue);
+					}
+					else if (curValue == 1)
+					{
+						B.add(curIndex);
+						listPbwt.add(curValue);
+//						System.out.println(pos);
+						exception.add(readsCurrList.get(curIndex).getException().get(0));
+						exBackUp.add(readsCurrList.get(curIndex).getException().get(0));
+						readsCurrList.get(curIndex).getException().remove(0);
+//						exceptionQual.add(curValQual);
+						qualB.add(curValQual);
+						exListLength++;
+					}
+					else
+					{
+						C.add(curIndex);
+						listPbwt.add(ReadElemEnum.END.ordinal());
+					}
+					
+				}
+
+				for (Integer ins : A)
+				{
+					index.add(ins);
+				}
+				for (Integer ins : B)
+				{
+					index.add(ins);
+				}
+				
+				// 异常值加入
+				if (!exception.isEmpty())
+				{
+					exceptionList.add(exception);
+				}
+				// read序列加入
+				listsPBWT.add(listPbwt);
+				// 正常质量分数加入
+				// 这里应该先是稀疏化处理，然后才是均质化处理，
+				// 这里丢给质量分数处理函数，处理。应该是单步在这里进行完成的
+				int avg = 0;
+				int Exavg = 0;
+				for (Character chr : qualA)
+				{
+					avg += chr;
+				}
+				// 这里注意，如果是大小为0的话，也需要加上一个0，站住这个位置
+				if (qualA.size() != 0)
+				{
+					listsPbwtQual.add((char) (avg / qualA.size()));
+				} 
+				for (Character chr : qualB)
+				{
+					Exavg += chr;
+				}
+				if (qualB.size() != 0)
+				{
+					exceptionQual.add((char) (Exavg / qualB.size()));
+				}
+
+				a.clear();
+				b.clear();
+				c.clear();
+				A.clear();
+				B.clear();
+//				C.clear();
+				qualA.clear();
+				qualB.clear();
+				// 这里是一个移除操作，因为每次都要删除第一个，所以需要不断的偏移求相对位置
+				// 这里改一下，删除更新，更新ak+1这个数组
+				int offset = 0;
+				int tempIndex = -1;
+				Collections.sort(C);
+				for (Integer ins : C)
+				{
+					readsCurrList.remove(ins - offset); // 删除序列
+					for (int i = 0; i < index.size(); i++)
+					{
+						if ((ins - offset) <= index.get(i))
+						{
+							tempIndex = index.get(i) - 1;
+							index.set(i, tempIndex);
+						}
+						// else if(ins == index.get(i))
+						// {
+						// index.remove(i);
+						// i--;
+						// }
+						else
+						{
+							// 什么也不做
+						}
+					}
+					offset++;
+				}
+				C.clear();
+				if(!index.isEmpty())
+				{
+					indexes.add(index);
+				}
+				
+			}
+			// 这里添加出现gap的情况,异常值，异常分数都是空，但是正常质量分数这里需要设置为null
+			else
+			{
+//				listPbwt.add(2);
+				indexes.add(index);
+				listsPBWT.add(listPbwt);
+//				listsPbwtQual.add(null);
+//				exceptionListQual.add(exceptionQual);
+//				exceptionList.add(exception);
+				
+			}
+			readsQualLength++;
+
+		}
+		tempIndexes = indexes;	// 先这样最简单化处理
+		result.setListsPBWT(listsPBWT);
+		result.setListsQual(listsPbwtQual);
+		result.setListExQual2(exceptionQual);
+		result.setListsExcep(exceptionList);
+		result.setIndexes(indexes); // indexes应该单独加入，因为之后修改不会全部保存
+//		System.out.println("listsPBWT size:"+result.getListsPBWT().size());
+		System.out.println("\n"+"pos:"+(pos-start[0]));
+		System.out.println();
+		System.out.println("Original PBWT(pbwtResult.length):\t");
+		// for(int i=0; i<listsPBWT.size(); i++)
+		// {
+		// System.out.println(listsPBWT.get(i).toString());
+		// }
+
+		return result;
+	}
+
 	
 	private ReadPbwtResult PBWTAlgo(ArrayList<ReadStruct> readsList, int[] start, int[] end)
 	{
@@ -3104,6 +3721,11 @@ public class MainEncoding2
 	// 这样只需要压缩value值就行了，不要需要压缩key了
 	// 我认为并不需要在进行了游程编码了，因为横向并不是具备生物特性，强行使用效果并不一定会非常好
 	// 之前的预处理我么可知，每一列必然有一个qual值，所以说不可能出现空的情况
+	/**
+	 * 既适用于有局部又适用于全局
+	 * @param vE
+	 * @return
+	 */
 	private static byte[] EncodePbwtSingleQual(ArrayList<Character> vE)
 	{
 		ArrayList<Character> reQual = vE;
@@ -3257,7 +3879,7 @@ public class MainEncoding2
 		ArrayList<ArrayList<Character>> exceptionQual = vE;
 		ArrayList<ArrayList<Integer>> exceptionQualProc = new ArrayList<ArrayList<Integer>>();
 		ArrayList<Integer> keys = new ArrayList<Integer>();
-		System.out.println("the length of VE"+vE.size());
+//		System.out.println("the length of VE"+vE.size());
 		System. out .println( " 内存信息 :" + toMemoryInfo());
 		for (ArrayList<Character> qualList : exceptionQual)
 		{
@@ -3605,6 +4227,77 @@ public class MainEncoding2
 					i++;
 				}
 				rawText.append(str.get(i) + "|");
+			}
+		}
+		String[] str = Huffman2.encodeText2(rawText.toString());
+
+		int length = 0; // crazy:用于记录str真正的长度；
+		for (int i = 0; i < str.length; i++)
+		{
+			System.out.println(str[i]);
+			if (str[i] == "")
+			{
+				length = i;
+				break;
+			}
+			length = i + 1;
+		}
+
+		ByteBuffer bytes = ByteBuffer.allocate(length * 2); // liyang:开辟双倍内存，short占用两个字节
+		for (int i = 0; i < length - 1; i++)
+		{
+			// System.out.println("bytes.postiton:\t"+bytes.position());
+			bytes.putShort((short) (Integer.parseInt(str[i], 2)));
+		}
+		// 最后一个位置再拼凑一下然后放进去
+		// System.out.println(str[length-1].length());
+		// ××××××××××××××××××××××××××××××××加上1没问题，但是你要怎么还原回去呢××××××××××××××××××××××××××××××××××××××××××
+		String strTemp = str[length - 1];
+		if (strTemp.length() < 16)
+		{
+			for (int num = 16 - strTemp.length(); num > 0; num--)
+			{
+				strTemp += "1";
+			}
+		} else
+		{
+
+		}
+		bytes.putShort((short) (Integer.parseInt(strTemp, 2)));
+		byte[] array = bytes.array();
+		System.out.println("the compression of ex has completed ");
+		return array;
+	}
+
+	/**
+	 * 适用于局部解压缩，因为列与列之间加上了双杠
+	 * @param vE
+	 * @return
+	 */
+	public static byte[] EncodeExceptionList4(ArrayList<ArrayList<String>> vE)
+	{
+		ArrayList<ArrayList<String>> exceptionList = vE;
+		Huffman2 huffman = new Huffman2();
+		String rateText = "AAACCCTTTGGG||DN";
+		huffman.handleRate(rateText);
+		StringBuilder rawText = new StringBuilder();
+		for (ArrayList<String> str : exceptionList)
+		{
+			if (str.isEmpty())
+			{
+				rawText.append("||");
+			} else if (str.size() == 1)
+			{
+				rawText.append(str.get(0) + "||");
+			} else
+			{
+				int i = 0;
+				while (i < str.size() - 1)
+				{
+					rawText.append(str.get(i) + "|");
+					i++;
+				}
+				rawText.append(str.get(i) + "||");
 			}
 		}
 		String[] str = Huffman2.encodeText2(rawText.toString());
