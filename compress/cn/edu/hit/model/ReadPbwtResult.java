@@ -19,8 +19,22 @@ public class ReadPbwtResult
 	
 	private ArrayList<ArrayList<Integer>> indexes;
 	
-	public ArrayList<Integer> auxInfo;
+	private int[] startPos;
 	
+	private int minStart;
+	
+	
+	
+	public int getMinStart()
+	{
+		return minStart;
+	}
+
+	public void setMinStart(int minStart)
+	{
+		this.minStart = minStart;
+	}
+
 	public ArrayList<ArrayList<Integer>> getIndexes()
 	{
 		return indexes;
@@ -51,7 +65,6 @@ public class ReadPbwtResult
 		this.listsExcep2 = listsExcep2;
 	}
 
-	private int[] startPos;
 
 	public int[] getStartPos()
 	{

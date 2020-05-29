@@ -20,6 +20,8 @@ import java.util.concurrent.TimeUnit;
 
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.text.AbstractDocument.LeafElement;
+import javax.xml.stream.events.EndDocument;
+
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.tools.ant.filters.FixCrLfFilter.AddAsisRemove;
 import org.apache.tools.ant.taskdefs.Exit;
@@ -27,7 +29,9 @@ import org.apache.tools.ant.taskdefs.optional.clearcase.ClearCase;
 import org.tukaani.xz.simple.PowerPC;
 import org.apache.tools.ant.taskdefs.optional.clearcase.ClearCase;
 
+import cn.edu.hit.model.AuxiliaryInfo;
 import cn.edu.hit.model.CompressResult;
+import cn.edu.hit.model.DeRead;
 import cn.edu.hit.model.PBWTReadRe;
 import cn.edu.hit.model.QualEnum;
 import cn.edu.hit.model.READSYMBOL;
@@ -43,6 +47,7 @@ import cn.edu.hit.testdata.Test2;
 import cn.edu.hit.util.Huffman2;
 import htsjdk.samtools.metrics.StringHeader;
 import htsjdk.samtools.seekablestream.ISeekableStreamFactory;
+import sun.security.krb5.internal.crypto.crc32;
 
 public class MainEncoding2
 {
@@ -61,7 +66,7 @@ public class MainEncoding2
 	public static void main(String[] args)
 	{
 		System. out .println( " 内存信息 :" + toMemoryInfo());
-		MainEncoding2 encoding = new MainEncoding2();
+//		MainEncoding2 encoding = new MainEncoding2();
 
 //		ReadPreProcess readPreProcess = new ReadPreProcess();
 //		String filePath = "/home/yangli/Documents/compress/5X/NC_5X.fastq.sorted.bam";
@@ -70,8 +75,10 @@ public class MainEncoding2
 
 		// reads 还需要经过一段处理，转化为Test1格式的数据
 		 Test1 testOne = new Test1(4);
-		 CompressResult testCompress = encoding.EncodePbwt(testOne);
-		 ReadPbwtResult reCompressRes = encoding.DeCodePbwt(testCompress);
+//		 GlobalCompression(testOne);
+		 LocalCompresssion(testOne);
+//		 CompressResult testCompress = encoding.EncodePbwt(testOne);
+//		 ReadPbwtResult reCompressRes = encoding.DeCodePbwt(testCompress);
 //		PrintInterval(reads);
 		
 //		long lstart1 = System.currentTimeMillis();
@@ -90,10 +97,71 @@ public class MainEncoding2
 		System.out.println("********************End********************");
 		System. out .println( " 内存信息 :" + toMemoryInfo());
 	}
-/**
- * 输出reads连续区域长度以及间隔长度
- * @param reads
- */
+	
+	/**
+	 * 局部压缩策略
+	 * @param testOne
+	 */
+	private static void LocalCompresssion(Test1 testOne)
+	{
+		MainEncoding2 encoding = new MainEncoding2();
+		CompressResult testCompress = encoding.EncodePbwt2(testOne);
+		partDeCompresssion(3, 14, testCompress);
+		ReadPbwtResult reCompressRes = encoding.DeCodePbwt2(testCompress);
+		
+	}
+	/**
+	 * 全局压缩策略
+	 * @param testOne
+	 */
+	private static void GlobalCompression(Test1 testOne)
+		{
+			MainEncoding2 encoding = new MainEncoding2();
+			CompressResult testCompress = encoding.EncodePbwt(testOne);
+			ReadPbwtResult reCompressRes = encoding.DeCodePbwt(testCompress);
+			
+		}
+	
+	
+	private static ArrayList<DeRead> partDeCompresssion(int start, int end, CompressResult testCompress)
+	{
+		int MinStart = 0;
+		MinStart = deCompressLen(testCompress.getStartResult());
+		if (end < MinStart)
+		{
+			return null;
+		}
+		
+		ArrayList<DeRead> reads = new ArrayList<>();
+		ReadPbwtResult reResult = new ReadPbwtResult();
+		ArrayList<ArrayList<Integer>> starToEndReads = new ArrayList<>();
+		ArrayList<ArrayList<String>> starToEndEx = new ArrayList<>();
+		ArrayList<Character> starToEndExQual = new ArrayList<>();
+		ArrayList<Character> starToEndQual = new ArrayList<>();
+		
+		AuxiliaryInfo count = new AuxiliaryInfo(start, end);
+		
+		// reads进行bit转为byte
+		starToEndReads = DecodeTPBWT(count,MinStart,testCompress.getReadsResult());
+		starToEndEx = deEncodeExceptionList(count,testCompress.getExceptionResult());
+		starToEndQual = deEncodeQual(count, testCompress.getReadQuaReasult());
+		starToEndExQual = deEncodeExQual(count, testCompress.getExceptionQuaResult());
+		
+		reResult.setMinStart(count.realstart);
+		reResult.setListsPBWT(starToEndReads);
+		reResult.setListsExcep(starToEndEx);
+		reResult.setListsQual(starToEndQual);
+		reResult.setListExQual2(starToEndExQual);
+		
+		reads = partPBWTAlgoRe(reResult);
+		return reads;
+	}
+	
+
+	/**
+	 * 输出reads连续区域长度以及间隔长度
+	 * @param reads
+	 */
 	private static void PrintInterval(ReadsPreProcessResult reads)
 	{
 		System.out.println("×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×*×");
@@ -173,25 +241,64 @@ public class MainEncoding2
 				+ "reCompressQualLength: " + reCompressRes.getListsQual().size());
 
 	}
-
+	
+	/**
+	 * 全局压缩策略
+	 * @param compressRes
+	 * @return
+	 */
 	private ReadPbwtResult DeCodePbwt(CompressResult compressRes)
 	{
 		ReadPbwtResult reResult = new ReadPbwtResult();
 
-		reResult.setStartPos(deStartPos(compressRes.getStartResult()));
+//		reResult.setStartPos(deStartPos(compressRes.getStartResult()));
+		reResult.setMinStart(deCompressLen(compressRes.getStartResult())); // 此处只是解压缩了minStart
+
+		reResult.setListsPBWT(DecodeTPBWT(compressRes.getReadsResult()));
+
+		reResult.setListsExcep2(Arrays.asList(deEncodeExceptionList(compressRes.getExceptionResult())));
+//		reResult.setListsExcep(deEncodeExceptionList(compressRes.getExceptionResult()));
+		
+		reResult.setListsQual(deEncodeQual2(compressRes.getReadQuaReasult()));
+
+//		reResult.setListExQual2(deEncodeExceptionQual2(compressRes.getExceptionQuaResult()));
+
+		reResult.setListExQual2(deEncodeQual2(compressRes.getExceptionQuaResult()));
+		
+		// 添加一个函数将其整合为reads
+		PBWTAlgoRe5(reResult);
+		return reResult;
+	}
+
+	/**
+	 * 局部压缩策略
+	 * @param compressRes
+	 * @return
+	 */
+	private ReadPbwtResult DeCodePbwt2(CompressResult compressRes)
+	{
+		ReadPbwtResult reResult = new ReadPbwtResult();
+
+//		reResult.setStartPos(deStartPos(compressRes.getStartResult()));
+		reResult.setMinStart(deCompressLen(compressRes.getStartResult())); // 此处只是解压缩了minStart
 
 		reResult.setListsPBWT(DecodeTPBWT(compressRes.getReadsResult()));
 
 //		reResult.setListsExcep2(Arrays.asList(deEncodeExceptionList(compressRes.getExceptionResult())));
-//		deEncodeExceptionList2(compressRes.getExceptionResult());
+		reResult.setListsExcep(deEncodeExceptionList2(compressRes.getExceptionResult()));
 		
-//		reResult.setListsQual(deEncodeQual2(compressRes.getReadQuaReasult()));
+		reResult.setListsQual(deEncodeQual2(compressRes.getReadQuaReasult()));
 
 //		reResult.setListExQual2(deEncodeExceptionQual2(compressRes.getExceptionQuaResult()));
 
+		reResult.setListExQual2(deEncodeQual2(compressRes.getExceptionQuaResult()));
+		
+		// 添加一个函数将其整合为reads
+		PBWTAlgoRe4(reResult);
 		return reResult;
 	}
 
+	
 	private ArrayList<Character> deEncodeQual2(byte[] pbwtQual)
 	{
 		ArrayList<Character> dexQual2 = new ArrayList<>();
@@ -668,25 +775,28 @@ public class MainEncoding2
 		System.out.println(strTail);
 		byte2EncodeResult += strTail;
 		Huffman2 huffman = new Huffman2();
-		String rateText = "AAACCCTTTGGG||,,DN";
+		String rateText = "AAACCCTTTGGG||DN";
 		huffman.handleRate(rateText);
 
-		String decodedResult = huffman.decodeText(byte2EncodeResult);
-		String decodeResult2 = decodedResult.substring(0, decodedResult.lastIndexOf("|"));
+		String decodedResult = huffman.decodeText(byte2EncodeResult); // bit还原为String
+		String decodeResult2 = decodedResult.substring(0, decodedResult.lastIndexOf("|")); // 去掉最后的结尾
 		// decodeResult2+="|"; // 这里可能会影响速度，之后再改
 
 		ArrayList<ArrayList<String>> deResult = new ArrayList<ArrayList<String>>();
 		String[] deTemp = decodeResult2.split("\\|",-1);
 		// 点隔开这里明天继续,注意空的问题
+		ArrayList<String> templist = new ArrayList<String>();
 		for (String str : deTemp)
 		{
-			String[] temp = str.split(",");
-			ArrayList<String> templist = new ArrayList<String>();
-			for (String str2 : temp)
+			if (!str.isEmpty())
 			{
-				templist.add(str2);
+				templist.add(str);
 			}
-			deResult.add(templist);
+			else
+			{
+				deResult.add(templist);
+				templist = new ArrayList<String>();
+			}
 		}
 
 		return deResult;
@@ -843,8 +953,155 @@ public class MainEncoding2
 			// System.out.println(testOne.getListsPBWT().get(i).toString());
 		}
 		// 在这里进行start的压缩，有什么用啊，把start信息在存放一遍，testOne中就有这个信息，需要在来一次吗
-		byte[] startPos = compressStartPos(testOne.readStart);
+//		byte[] startPos = compressStartPos(testOne.readStart);
+//		allRes.setStartResult(startPos);
+		// 对每个read从头遍历到尾，把各个信息加入到struct中
+		ArrayList<ReadStruct> readsList = new ArrayList<ReadStruct>();
+		int index = 0; // 异常信息的索引
+		for (int i = 0; i < testOne.listsPBWT.size(); i++)
+		{
+			ReadStruct struct = new ReadStruct();
+			struct.setStartAlignment(start[i]);
+			struct.setEndAlignment(end[i]);
+			ArrayList<Integer> list = new ArrayList<Integer>();
+			// ArrayList<String> qualist = new ArrayList<>();
+			int fla = 0; // 变异监测位
+			for (int j = 0; j < testOne.getListsPBWT().get(i).size(); j++)
+			{
+				Integer val = testOne.getListsPBWT().get(i).get(j);
+				list.add(val);
+				if (val == 1)
+				{
+					fla = 1;
+				}
+			}
+			// 这里处理注意了readquality是全部的不单单是异常值，所以说在改写主函数的时候这里注意
+			struct.setReads(list);
+			struct.setReadQuality(testOne.getReadQual().get(i).toString());
+			// struct.setReadQuality(testOne.getReadQual().get(i));
+			if (fla == 1)
+			{
+				struct.setException(testOne.getExceptionList().get(index));
+				struct.setExceptionQuality(testOne.getExceptionListQual().get(index));
+				index++;
+			} else
+			{
+				ArrayList<String> exnull = new ArrayList<>();
+				ArrayList<String> exqnull = new ArrayList<>();
+				struct.setException(exnull);
+				struct.setExceptionQuality(exqnull);
+			}
+			readsList.add(struct);
+		}
+		// pbwt 变化
+//		pbwtres = PBWTAlgo(readsList, start, end);
+		// 这里改写为我们正确的排序算法
+		
+//		pbwtres = PBWTAlgo2(readsList, start, end);
+		
+//		局部解压缩算法压缩过程
+		pbwtres = PBWTAlgo5(readsList, start, end);
+		
+		
+		
+//		ArrayList<ArrayList<Integer>> pbwtResult = pbwtres.getListsPBWT();
+
+		// ArrayList<ArrayList<Integer>> repbwt = PBWTAlgoRe(pbwtResult, start,end); //
+		// 之前需要其实和终止位置
+		// ArrayList<ArrayList<Integer>> repbwt = PBWTAlgoRe(pbwtResult);
+
+		// PbwtIsTrue(testOne.listsPBWT,repbwt);
+
+		// 继续写二进制编码，这里有一个问题就是，还原的时候需要起始位置那需不需要长度。
+		// 这里想法第一，用不用水平编码，我认为深度达到一定用垂直方向压缩效果才好，但是如果达不到效果肯定一般。
+		// 第二点使用了pbwt变换之后数据更加集中了，然后是不是可以在此基础上在进行一步变换是数据更加几种呢
+		// 最后的那个3，用处就是知道这里是结束了，但是问题是在这里必然停止了水平编码。我们是不是可以换一种方式就是结尾用7个1表示，因为如果达到一定数量不匹配就是
+		// ss了，所以说用7个1表示，肯定是比之前好，不连接一样的，如果连上了效果更好。
+		// 如果完全去了3，那么这样效果更好，但是再还原的时候就需要长度信息，不然就无法还原。
+		// 起始位置信息也需要压缩，不然利用参考序列是无法进行还原的
+//		byte[] value2by = binaryValues(values);
+
+//		runLen(keys, values, pbwtResult);
+		
+		int minStart = testOne.readStart[0];
+		byte[] startPos = new byte[4];
+		compressLen(minStart, startPos);
 		allRes.setStartResult(startPos);
+		
+		runLen(keys, values, pbwtres);
+		byte[] kv = binaryKV(keys, values);
+//		byte[] keyAndValue = (byte[]) ArrayUtils.addAll(StartPos, kv);
+		// 首先是对value值进行压缩，范围在1B-3B，长度不超过128的为1B，超过128的为3B
+
+		// 对于key值的压缩4个合成为一个
+//		byte[] key2by = binaryKeys(keys);
+		// 先key在value好一点，因为长度较短。这里有两个方式能够在解压缩的时候将keyAndValue分开。一个是记录key的长度，一个是加上间隔符号
+
+//		byte[] keyAndValue = (byte[]) ArrayUtils.addAll(value2by, key2by);
+//		System.out.println("keysAndValues size:\t" + keyAndValue.length);
+
+//		int len = value2by.length;
+//		byte[] len2 = new byte[4];
+//		compressLen(len, len2);
+		// int delen = deCompressLen(len2);
+		// if(len == delen)
+		// {
+		// System.out.println("It's right(compress len)");
+		// }
+		// else
+		// {
+		// System.out.println("It's wrong(compress len)");
+		// }
+//		keyAndValue = (byte[]) ArrayUtils.addAll(len2, keyAndValue);
+
+		// DecodePbwt(key2by, value2by);
+		// 这里仅仅是2进制还原，并不带有pbwt还原。再去证明一下正确性
+		// ArrayList<ArrayList<Integer>> rePBWT = DecodePBWT(keyAndValue);
+
+		// PbwtIsTrue(pbwtResult,rePBWT);
+
+		// 在这里进行余下的几个部分的压缩工作
+		byte[] exBy = EncodeExceptionList2(pbwtres.getListsExcep2());
+		// MainEncoding2.deEncodeExceptionList(exBy);
+		// 需要改两处，一个是质量分数都全部认为是char，然后是正常质量分数一列是一个值
+		byte[] exQual = EncodePbwtSingleQual(pbwtres.getListExQual2());
+		byte[] pbwtQual = EncodePbwtSingleQual(pbwtres.getListsQual());
+		// ArrayList<Character> qual = deEncodeQual2(pbwtQual);
+		// byte[] pbwtQual = MainEncoding2.EncodePbwtQual(pbwtres.getListsQual());
+
+		allRes.setExceptionResult(exBy);
+		allRes.setExceptionQuaResult(exQual);
+		allRes.setReadQuaReasult(pbwtQual);
+		allRes.setReadsResult(kv);
+
+		return allRes;
+	}
+	/**
+	 * 局部压缩策略
+	 * @param testOne
+	 * @return
+	 */
+	public CompressResult EncodePbwt2(Test1 testOne)
+	{
+		// CompressResult allRes = new CompressResult();
+		ReadPbwtResult pbwtres = new ReadPbwtResult();
+		List<Integer> keys = new ArrayList<Integer>();
+		List<Integer> values = new ArrayList<Integer>();
+		Integer[] start = new Integer[testOne.readStart.length];
+		Integer[] end = new Integer[testOne.readEnd.length];
+
+		System.out.println("Original reads(Test.one.length):\t");
+		// 这里是一次遍历 不知道之后这里是不是可以简化一下,在这里可以进行start的压缩过程。
+		for (int i = 0; i < start.length; i++)
+		{
+			start[i] = testOne.readStart[i];
+			end[i] = testOne.readEnd[i];
+			PrintReads1(start[i], testOne.getListsPBWT().get(i));
+			// System.out.println(testOne.getListsPBWT().get(i).toString());
+		}
+		// 在这里进行start的压缩，有什么用啊，把start信息在存放一遍，testOne中就有这个信息，需要在来一次吗
+//		byte[] startPos = compressStartPos(testOne.readStart);
+//		allRes.setStartResult(startPos);
 		// 对每个read从头遍历到尾，把各个信息加入到struct中
 		ArrayList<ReadStruct> readsList = new ArrayList<ReadStruct>();
 		int index = 0; // 异常信息的索引
@@ -891,57 +1148,14 @@ public class MainEncoding2
 		
 //		局部解压缩算法压缩过程
 		pbwtres = PBWTAlgo4(readsList, start, end);
+			
+		int minStart = testOne.readStart[0];
+		byte[] startPos = new byte[4];
+		compressLen(minStart, startPos);
+		allRes.setStartResult(startPos);
 		
-		
-		
-//		ArrayList<ArrayList<Integer>> pbwtResult = pbwtres.getListsPBWT();
-
-		// ArrayList<ArrayList<Integer>> repbwt = PBWTAlgoRe(pbwtResult, start,end); //
-		// 之前需要其实和终止位置
-		// ArrayList<ArrayList<Integer>> repbwt = PBWTAlgoRe(pbwtResult);
-
-		// PbwtIsTrue(testOne.listsPBWT,repbwt);
-
-		// 继续写二进制编码，这里有一个问题就是，还原的时候需要起始位置那需不需要长度。
-		// 这里想法第一，用不用水平编码，我认为深度达到一定用垂直方向压缩效果才好，但是如果达不到效果肯定一般。
-		// 第二点使用了pbwt变换之后数据更加集中了，然后是不是可以在此基础上在进行一步变换是数据更加几种呢
-		// 最后的那个3，用处就是知道这里是结束了，但是问题是在这里必然停止了水平编码。我们是不是可以换一种方式就是结尾用7个1表示，因为如果达到一定数量不匹配就是
-		// ss了，所以说用7个1表示，肯定是比之前好，不连接一样的，如果连上了效果更好。
-		// 如果完全去了3，那么这样效果更好，但是再还原的时候就需要长度信息，不然就无法还原。
-		// 起始位置信息也需要压缩，不然利用参考序列是无法进行还原的
-//		byte[] value2by = binaryValues(values);
-
-//		runLen(keys, values, pbwtResult);
 		runLen(keys, values, pbwtres);
 		byte[] kv = binaryKV(keys, values);
-		// 首先是对value值进行压缩，范围在1B-3B，长度不超过128的为1B，超过128的为3B
-
-		// 对于key值的压缩4个合成为一个
-//		byte[] key2by = binaryKeys(keys);
-		// 先key在value好一点，因为长度较短。这里有两个方式能够在解压缩的时候将keyAndValue分开。一个是记录key的长度，一个是加上间隔符号
-
-//		byte[] keyAndValue = (byte[]) ArrayUtils.addAll(value2by, key2by);
-//		System.out.println("keysAndValues size:\t" + keyAndValue.length);
-
-//		int len = value2by.length;
-//		byte[] len2 = new byte[4];
-//		compressLen(len, len2);
-		// int delen = deCompressLen(len2);
-		// if(len == delen)
-		// {
-		// System.out.println("It's right(compress len)");
-		// }
-		// else
-		// {
-		// System.out.println("It's wrong(compress len)");
-		// }
-//		keyAndValue = (byte[]) ArrayUtils.addAll(len2, keyAndValue);
-
-		// DecodePbwt(key2by, value2by);
-		// 这里仅仅是2进制还原，并不带有pbwt还原。再去证明一下正确性
-		// ArrayList<ArrayList<Integer>> rePBWT = DecodePBWT(keyAndValue);
-
-		// PbwtIsTrue(pbwtResult,rePBWT);
 
 		// 在这里进行余下的几个部分的压缩工作
 		byte[] exBy = EncodeExceptionList4(pbwtres.getListsExcep());
@@ -960,6 +1174,7 @@ public class MainEncoding2
 		return allRes;
 	}
 
+	
 	
 	/**
 	 * 针对真实数据的压缩算法
@@ -1470,10 +1685,10 @@ public class MainEncoding2
 						// 同时加入结束的分隔符
 						// 暂作为间隔符使用,在这里不会有2出现，用2来表示单条listpbwt的终止
 						// 需要加上这个2吗，2作为一条listpbwt的终止
-						if (zeroFlag&&oneFlag)
+						if (!zeroFlag&&oneFlag)
 						{
 							keys.add(2);
-							values.add(1);
+							values.add(3);
 						}
 						else if (zeroFlag&&!oneFlag) 
 						{
@@ -1481,9 +1696,9 @@ public class MainEncoding2
 							values.add(2);
 						}
 						else 
-						{
+						{	// 包含了全是3和0,1混合的情况
 							keys.add(2);
-							values.add(3);
+							values.add(1);
 						}
 					}
 				}
@@ -1622,19 +1837,19 @@ public class MainEncoding2
 	public static ArrayList<ArrayList<Integer>> DecodeTPBWT(byte[] byteKV)
 	{
 		// 首先截取前四位为长度，然后4+长度为value。顺次解压完成之后再去解压key，在解压key的同时完成pbwt的还原工作
-		ArrayList<Integer> bKeys = new ArrayList<Integer>();
-		ArrayList<Integer> bVals = new ArrayList<Integer>();
+//		ArrayList<Integer> bKeys = new ArrayList<Integer>();
+//		ArrayList<Integer> bVals = new ArrayList<Integer>();
 
-		ArrayList<ArrayList<Integer>> reList = new ArrayList<ArrayList<Integer>>();
+//		ArrayList<ArrayList<Integer>> reList = new ArrayList<ArrayList<Integer>>();
 		ArrayList<ArrayList<Integer>> result = new ArrayList<ArrayList<Integer>>();
 		
-		DebitKV(byteKV, bKeys, bVals);
+//		DebitKV(byteKV, bKeys, bVals);  // 解压缩为key 和 value
 		
-		reList = reListPbwt2(bKeys, bVals);
+//		reList = reListPbwt2(bKeys, bVals); // 解压缩为短读序列
 		
 		// result 这里需要pbwt还原
-		result = PBWTAlgoRe2(reList);
-
+//		result = PBWTAlgoRe2(reList); // 逆向pbwt还原
+		result = DebitKV(byteKV);
 		return result;
 
 	}
@@ -1650,7 +1865,6 @@ public class MainEncoding2
 		int value = -1;
 		int key = -1;
 		int lenFlag = -1;
-		
 		for(int i =0; i<byteKV.length; i++)
 		{
 			tempByte = byteKV[i] + 128;
@@ -1677,6 +1891,102 @@ public class MainEncoding2
 			bKeys.add(key);
 			bVals.add(value);
 		}
+	}
+
+	/**
+	 * 将bit转换为key和value，然后转换为RL整合到一起
+	 * 将空列位置保留了下来
+	 * REF参数没有传出去，且3和2认为一种情况
+	 * @param byteKV
+	 * @return reListsPBWT
+	 */
+	private static ArrayList<ArrayList<Integer>> DebitKV(byte[] byteKV)
+	{
+		int tempByte = 0;
+		int tempByte2 = 0;
+		int value = -1;
+		int key = -1;
+		int lenFlag = -1;
+		int lastvalue = -1;
+		boolean oneFlag = false;
+		boolean zeroFlag =false;
+		ArrayList<ArrayList<Integer>> reListsPBWT = new ArrayList<ArrayList<Integer>>();
+		ArrayList<Integer> pbwt = new ArrayList<Integer>();
+		ArrayList<Integer> REF = new ArrayList<>();
+		
+		for(int i =0; i<byteKV.length; i++)
+		{
+			tempByte = byteKV[i] + 128;
+			key = (tempByte >> 6)%4;
+			if (key == 2)
+			{
+				value = (tempByte >> 4)%4;
+				if (value == 1) // key 为1，0,1混合或者空或者全是3
+				{
+					if (zeroFlag && oneFlag)
+					{
+						REF.add(10);
+					}
+					else if (lastvalue!=2)
+					{
+						// 上一个value不是2说明该列不为空
+						// 暂时认为情况一样
+						REF.add(2);
+					}
+					else
+					{
+						// 上述条件一个都不满足
+						REF.add(2);
+					}
+				}
+				else if (value == 2)	// value 为2 全是0情况
+				{
+					REF.add(0);
+				}
+				else	// value为3，全是1情况
+				{
+					REF.add(1);
+				}
+				zeroFlag = false;
+				oneFlag = false;
+				reListsPBWT.add(pbwt);
+				pbwt = new ArrayList<>();
+			}
+			// 当key为0,1,3时候都有可能长度超过31
+			else
+			{
+				if (!zeroFlag && key == 0)
+				{
+					zeroFlag = true;
+				}
+				else if (!oneFlag && key == 1)
+				{
+					oneFlag = true;
+				}
+				else {
+					// 为三的情况
+				}
+				lenFlag = (tempByte >> 5)%2;
+				if (lenFlag == 1)
+				{
+					i++;
+					tempByte2 = byteKV[i] + 128;
+					value = tempByte%32*256 + tempByte2; // 这里稍有问题，暂时这样
+				}
+				else 
+				{
+					value = tempByte%32;
+				}
+
+				// 0,1,3情况转换为RL
+				while(value--> 0) 
+				{
+					pbwt.add(key);
+				}
+			}
+			lastvalue = value;
+		}
+		return reListsPBWT;
 	}
 
 	
@@ -2179,6 +2489,493 @@ public class MainEncoding2
 		return readsResult;
 	}
 
+	/**
+	 * 改写输入参数，按照每一条reads存储,局部压缩
+	 * @param pbwtResult
+	 * @return
+	 */
+	private static ArrayList<DeRead> PBWTAlgoRe4(ReadPbwtResult reResult)
+	{
+		ArrayList<ArrayList<Integer>> pbwtResult = new ArrayList<>();
+		
+		ArrayList<DeRead> readsCurTemp = new ArrayList<>();
+		ArrayList<DeRead> result = new ArrayList<>();
+
+		int MinStart = reResult.getMinStart();
+		pbwtResult = reResult.getListsPBWT();
+		int curValue = -1;
+		char curReadQual;
+		char curExQual;
+		String curEx = null;
+		
+		int qualIndex = 0;
+		int exQualIndex = 0;
+		int exIndex = 0;
+		
+		ArrayList<Integer> reIndex;	// 构建当前列索引
+		ArrayList<ArrayList<Integer>> Index = new ArrayList<>(); // 所有索引信息
+	
+		int indexpos = -1;
+		int posValue = -1;
+
+		ArrayList<Integer> c;
+		ArrayList<Integer> d;
+		
+		boolean oneFlag = false;
+		boolean zeroFlag = false;
+		
+		int preSize = 0; // 定义之前的碱基值和之前列的大小
+		int currSize = 0, currAddSize = 0; // 定义当前的
+		ArrayList<Integer> removeIndexRe = new ArrayList<Integer>();
+		Boolean removeFlag = false;
+		int pre = 0; // 索引空间大小
+		int cur = 0; // currentlist当前被删除元素之前序列数量
+		LinkedList<Integer> posIndex = new LinkedList<Integer>(); // 位置索引表，表示插入到输出list中位置
+		// 比对完之后从左往右
+		for(int col = 0; col < pbwtResult.size(); col++)
+		{
+			preSize = readsCurTemp.size(); // 前一列大小用currlist大小表示
+			currSize = pbwtResult.get(col).size(); // 用取到pbwt当前列表示
+			currAddSize = currSize > preSize ? (currSize - preSize) : 0; // 新加入序列大小
+			// 构造还原空间
+			for (int i = 0; i < currAddSize; i++)
+			{
+				DeRead listTemp = new DeRead();
+				listTemp.setStart(MinStart+col); // 在创建序列的时候设置起始位置信息
+				readsCurTemp.add(listTemp);
+				if (col != 0)
+				{
+					int length = Index.size() - 1;
+					int length2= Index.get(length).size(); // 会不断更新
+					Index.get(length).add(length2);
+				}
+			}
+			if (!readsCurTemp.isEmpty())
+			{
+				c = new ArrayList<>();
+				d = new ArrayList<>();
+				// 第一列或者是前一列为空列
+				if (col == 0)
+				{
+					reIndex = new ArrayList<>();
+					int preIndex = 0;
+					
+					for (int i = 0; i < readsCurTemp.size(); i++)
+					{
+						curValue = pbwtResult.get(col).get(i);
+						preIndex = i;
+						readsCurTemp.get(i).getRead().add(curValue);
+						if (curValue == 0)
+						{
+							// 加入质量分数,一列都是一个值
+							curReadQual = reResult.getListsQual().get(qualIndex);
+							readsCurTemp.get(i).getReadQual().add(curReadQual);
+							readsCurTemp.get(i).getQual().add(curReadQual);
+							c.add(preIndex);
+							zeroFlag = true;
+						}
+						else if (curValue == 1) {
+							// 添加异常信息，一列都是一个质量分数
+							curExQual = reResult.getListsQual().get(exQualIndex);
+							curEx = reResult.getListsExcep().get(exIndex).get(0);
+							readsCurTemp.get(i).getExQual().add(curExQual);
+							readsCurTemp.get(i).getQual().add(curExQual);
+							readsCurTemp.get(i).getExBase().add(curEx);
+							reResult.getListsExcep().get(exIndex).remove(0);
+							d.add(preIndex);
+							oneFlag = true;
+						}
+						else {
+							// 当前为三，一般不可能
+						}
+						reIndex.add(i);
+					}
+					if (oneFlag)
+					{
+						exQualIndex++;
+						exIndex++;
+						oneFlag = false;
+					}
+					if (zeroFlag)
+					{
+						qualIndex++;
+						zeroFlag = false;
+					}
+					c.addAll(d);
+					Index.add(reIndex);
+					Index.add(c);
+					continue;
+				}
+				// 对于RL纵向序列采用逆TPBWT还原
+				for (int row = 0; row < currSize; row++)
+				{
+					indexpos = Index.get(col).get(row);
+					posValue = pbwtResult.get(col).get(row);
+					if (posValue == 0){
+						c.add(indexpos);
+						readsCurTemp.get(indexpos).getRead().add(posValue);
+						curReadQual = reResult.getListsQual().get(qualIndex);
+						readsCurTemp.get(indexpos).getReadQual().add(curReadQual);
+						readsCurTemp.get(indexpos).getQual().add(curReadQual); // 不要忘记在最后对计数器改变值
+						zeroFlag = true;
+						
+					}
+					else if (posValue == 1) {
+						d.add(indexpos);
+						readsCurTemp.get(indexpos).getRead().add(posValue);
+						curExQual = reResult.getListsQual().get(exQualIndex);
+						curEx = reResult.getListsExcep().get(exIndex).get(0);
+						readsCurTemp.get(indexpos).getExQual().add(curExQual);
+						readsCurTemp.get(indexpos).getExBase().add(curEx);
+						reResult.getListsExcep().get(exIndex).remove(0);
+						oneFlag = true;
+					}
+					else if (posValue == ReadElemEnum.END.ordinal()) {
+						readsCurTemp.get(indexpos).getRead().add(posValue);
+						removeIndexRe.add(indexpos);
+						removeFlag = true;
+					}
+					else {
+						// 这个位置留给情况2
+						// 索引的处理放在后面，
+					}
+				}
+				// 在这里构建下一列的索引
+				// 并且该自增1的在这里判断
+				if (oneFlag)
+				{
+					exQualIndex++;
+					exIndex++;
+					oneFlag = false;
+				}
+				if (zeroFlag)
+				{
+					qualIndex++;
+					zeroFlag = false;
+				}
+				
+				// 在这里构建下一列的索引
+				// 改一下，放在后面需要进行一步删除操作
+				c.addAll(d);
+				
+				if (removeFlag == true)
+				{
+					// 删除结尾为3的序列并且同时改变索引表
+					int offset = 0;
+					Collections.sort(removeIndexRe);
+					for (Integer ins : removeIndexRe)
+					{
+						pre = posIndex.size();
+						cur = ins - offset;
+						// 删除序列操作
+						if (pre == cur)
+						{
+							// 加在末尾
+							result.add(readsCurTemp.get(ins - offset));
+							readsCurTemp.remove(ins - offset);
+							
+						}
+						else if (pre<cur) {
+							for (int i = 0; i < cur-pre; i++)
+							{
+								DeRead empty = new DeRead();
+								result.add(empty);
+								posIndex.add(result.size() - 1);
+							}
+							result.add(readsCurTemp.get(ins - offset));
+							readsCurTemp.remove(ins - offset);
+						}
+						else {
+							// 此时表明之前没有出去的序列要出去
+							int pos = posIndex.get(cur);
+							posIndex.remove(cur);
+							result.set(pos, readsCurTemp.get(ins - offset));
+							readsCurTemp.remove(ins - offset);
+						}
+						// 改变索引表
+						int tempIndex = -1;
+						for (int i = 0; i < c.size(); i++)
+						{
+							if ((ins - offset)<=c.get(i))
+							{
+								tempIndex = c.get(i)-1;
+								c.set(i, tempIndex);
+							}
+//							else if ((ins - offset) == c.get(i))
+//							{
+//								c.remove(i);
+//								i--;
+//							}
+//							else {
+//								
+//							}
+						}
+						
+						offset++;
+					}
+					removeIndexRe.clear();
+					removeFlag = false;
+				}
+				
+				// 在这里构建下一列的索引
+				// 改一下，放在后面需要进行一步删除操作
+				Index.add(c);
+				
+			}
+			else
+			{
+				// 这里是针对该列为空的情况，单独设计
+				ArrayList<Integer> emptyIndex = new ArrayList<>();
+				Index.add(emptyIndex);
+			}
+			
+		}
+	return result;	
+	}
+	
+	/**
+	 * 继承于4，适用于全局
+	 * @param reResult
+	 * @return
+	 */
+	private static ArrayList<DeRead> PBWTAlgoRe5(ReadPbwtResult reResult)
+	{
+		ArrayList<ArrayList<Integer>> pbwtResult = new ArrayList<>();
+		
+		ArrayList<DeRead> readsCurTemp = new ArrayList<>();
+		ArrayList<DeRead> result = new ArrayList<>();
+
+		int MinStart = reResult.getMinStart();
+		pbwtResult = reResult.getListsPBWT();
+		int curValue = -1;
+		char curReadQual;
+		char curExQual;
+		String curEx = null;
+		
+		int qualIndex = 0;
+		int exQualIndex = 0;
+		int exIndex = 0;
+		
+		ArrayList<Integer> reIndex;	// 构建当前列索引
+		ArrayList<ArrayList<Integer>> Index = new ArrayList<>(); // 所有索引信息
+	
+		int indexpos = -1;
+		int posValue = -1;
+
+		ArrayList<Integer> c;
+		ArrayList<Integer> d;
+		
+		boolean oneFlag = false;
+		boolean zeroFlag = false;
+		
+		int preSize = 0; // 定义之前的碱基值和之前列的大小
+		int currSize = 0, currAddSize = 0; // 定义当前的
+		ArrayList<Integer> removeIndexRe = new ArrayList<Integer>();
+		Boolean removeFlag = false;
+		int pre = 0; // 索引空间大小
+		int cur = 0; // currentlist当前被删除元素之前序列数量
+		LinkedList<Integer> posIndex = new LinkedList<Integer>(); // 位置索引表，表示插入到输出list中位置
+		// 比对完之后从左往右
+		for(int col = 0; col < pbwtResult.size(); col++)
+		{
+			preSize = readsCurTemp.size(); // 前一列大小用currlist大小表示
+			currSize = pbwtResult.get(col).size(); // 用取到pbwt当前列表示
+			currAddSize = currSize > preSize ? (currSize - preSize) : 0; // 新加入序列大小
+			// 构造还原空间
+			for (int i = 0; i < currAddSize; i++)
+			{
+				DeRead listTemp = new DeRead();
+				listTemp.setStart(MinStart+col); // 在创建序列的时候设置起始位置信息
+				readsCurTemp.add(listTemp);
+				if (col != 0)
+				{
+					int length = Index.size() - 1;
+					int length2= Index.get(length).size(); // 会不断更新
+					Index.get(length).add(length2);
+				}
+			}
+			if (!readsCurTemp.isEmpty())
+			{
+				c = new ArrayList<>();
+				d = new ArrayList<>();
+				// 第一列或者是前一列为空列
+				if (col == 0)
+				{
+					reIndex = new ArrayList<>();
+					int preIndex = 0;
+					
+					for (int i = 0; i < readsCurTemp.size(); i++)
+					{
+						curValue = pbwtResult.get(col).get(i);
+						preIndex = i;
+						readsCurTemp.get(i).getRead().add(curValue);
+						if (curValue == 0)
+						{
+							// 加入质量分数,一列都是一个值
+							curReadQual = reResult.getListsQual().get(qualIndex);
+							readsCurTemp.get(i).getReadQual().add(curReadQual);
+							readsCurTemp.get(i).getQual().add(curReadQual);
+							c.add(preIndex);
+							zeroFlag = true;
+						}
+						else if (curValue == 1) {
+							// 添加异常信息，一列都是一个质量分数
+							curExQual = reResult.getListsQual().get(exQualIndex);
+							curEx = reResult.getListsExcep2().get(exIndex);
+							readsCurTemp.get(i).getExQual().add(curExQual);
+							readsCurTemp.get(i).getQual().add(curExQual);
+							readsCurTemp.get(i).getExBase().add(curEx);
+							exIndex++;
+							d.add(preIndex);
+							oneFlag = true;
+						}
+						else {
+							// 当前为三，一般不可能
+						}
+						reIndex.add(i);
+					}
+					if (oneFlag)
+					{
+						exQualIndex++;
+						oneFlag = false;
+					}
+					if (zeroFlag)
+					{
+						qualIndex++;
+						zeroFlag = false;
+					}
+					c.addAll(d);
+					Index.add(reIndex);
+					Index.add(c);
+					continue;
+				}
+				// 对于RL纵向序列采用逆TPBWT还原
+				for (int row = 0; row < currSize; row++)
+				{
+					indexpos = Index.get(col).get(row);
+					posValue = pbwtResult.get(col).get(row);
+					if (posValue == 0){
+						c.add(indexpos);
+						readsCurTemp.get(indexpos).getRead().add(posValue);
+						curReadQual = reResult.getListsQual().get(qualIndex);
+						readsCurTemp.get(indexpos).getReadQual().add(curReadQual);
+						readsCurTemp.get(indexpos).getQual().add(curReadQual); // 不要忘记在最后对计数器改变值
+						zeroFlag = true;
+						
+					}
+					else if (posValue == 1) {
+						d.add(indexpos);
+						readsCurTemp.get(indexpos).getRead().add(posValue);
+						curExQual = reResult.getListsQual().get(exQualIndex);
+						curEx = reResult.getListsExcep2().get(exIndex);
+						readsCurTemp.get(indexpos).getExQual().add(curExQual);
+						readsCurTemp.get(indexpos).getExBase().add(curEx);
+						exIndex++;
+						oneFlag = true;
+					}
+					else if (posValue == ReadElemEnum.END.ordinal()) {
+						readsCurTemp.get(indexpos).getRead().add(posValue);
+						removeIndexRe.add(indexpos);
+						removeFlag = true;
+					}
+					else {
+						// 这个位置留给情况2
+						// 索引的处理放在后面，
+					}
+				}
+				// 在这里构建下一列的索引
+				// 并且该自增1的在这里判断
+				if (oneFlag)
+				{
+					exQualIndex++;
+					oneFlag = false;
+				}
+				if (zeroFlag)
+				{
+					qualIndex++;
+					zeroFlag = false;
+				}
+				
+				// 在这里构建下一列的索引
+				// 改一下，放在后面需要进行一步删除操作
+				c.addAll(d);
+				
+				if (removeFlag == true)
+				{
+					// 删除结尾为3的序列并且同时改变索引表
+					int offset = 0;
+					Collections.sort(removeIndexRe);
+					for (Integer ins : removeIndexRe)
+					{
+						pre = posIndex.size();
+						cur = ins - offset;
+						// 删除序列操作
+						if (pre == cur)
+						{
+							// 加在末尾
+							result.add(readsCurTemp.get(ins - offset));
+							readsCurTemp.remove(ins - offset);
+							
+						}
+						else if (pre<cur) {
+							for (int i = 0; i < cur-pre; i++)
+							{
+								DeRead empty = new DeRead();
+								result.add(empty);
+								posIndex.add(result.size() - 1);
+							}
+							result.add(readsCurTemp.get(ins - offset));
+							readsCurTemp.remove(ins - offset);
+						}
+						else {
+							// 此时表明之前没有出去的序列要出去
+							int pos = posIndex.get(cur);
+							posIndex.remove(cur);
+							result.set(pos, readsCurTemp.get(ins - offset));
+							readsCurTemp.remove(ins - offset);
+						}
+						// 改变索引表
+						int tempIndex = -1;
+						for (int i = 0; i < c.size(); i++)
+						{
+							if ((ins - offset)<=c.get(i))
+							{
+								tempIndex = c.get(i)-1;
+								c.set(i, tempIndex);
+							}
+//							else if ((ins - offset) == c.get(i))
+//							{
+//								c.remove(i);
+//								i--;
+//							}
+//							else {
+//								
+//							}
+						}
+						
+						offset++;
+					}
+					removeIndexRe.clear();
+					removeFlag = false;
+				}
+				
+				// 在这里构建下一列的索引
+				// 改一下，放在后面需要进行一步删除操作
+				Index.add(c);
+				
+			}
+			else
+			{
+				// 这里是针对该列为空的情况，单独设计
+				ArrayList<Integer> emptyIndex = new ArrayList<>();
+				Index.add(emptyIndex);
+			}
+			
+		}
+	return result;	
+	}
+
+	
 	
 	// 这里处理有一个问题就是，我把pbwt的变化也加入其中了。但是之前进行质量分数的压缩是没哟经过pbwt变化的质量分数的压缩。
 	// 最后我们需要看看到底考没考虑最特殊的情况就是完全匹配上去的情况
@@ -3260,6 +4057,282 @@ public class MainEncoding2
 		return result;
 	}
 
+	/**
+	 * 全局压缩最终，异常值处理方式按照一维存储
+	 * @param readsList
+	 * @param start
+	 * @param end
+	 * @return
+	 */
+	private ReadPbwtResult PBWTAlgo5(ArrayList<ReadStruct> readsList, Integer[] start, Integer[] end)
+	{
+		ArrayList<Integer> a = new ArrayList<Integer>(); // 存储为0的值
+		ArrayList<Integer> b = new ArrayList<Integer>(); // 存储为1的值
+		ArrayList<Integer> c = new ArrayList<Integer>(); // 存储新加入的值，在这里，就是ReadElemEnum.START部分 liyang:应该是存储3
+		
+		// 用于构建ak数组
+		ArrayList<Integer> A = new ArrayList<Integer>();
+		ArrayList<Integer> B = new ArrayList<Integer>();
+		ArrayList<Integer> C = new ArrayList<Integer>();
+		ArrayList<Character> qualA = new ArrayList<Character>();
+		ArrayList<Character> qualB = new ArrayList<Character>();
+
+		ArrayList<ArrayList<Integer>> listsPBWT = new ArrayList<ArrayList<Integer>>();
+		ArrayList<Character> listsPbwtQual = new ArrayList<Character>();
+		ArrayList<ArrayList<String>> exceptionList = new ArrayList<ArrayList<String>>();
+//		ArrayList<ArrayList<Character>> exceptionListQual = new ArrayList<ArrayList<Character>>();
+		ArrayList<Character> exceptionQual = new ArrayList<Character>();
+		ArrayList<String> exception2 = new ArrayList<>();
+		ArrayList<ArrayList<Integer>> indexes = new ArrayList<>();	// 用于存储所有的ak
+		
+		ArrayList<ReadStruct> readsCurrList = new ArrayList<ReadStruct>();
+		ReadPbwtResult result = new ReadPbwtResult();
+
+		// 检测一下是否正常排序
+		int endindex = 0;
+		for (int i = 0; i < start.length; i++)
+		{
+			if (i > 1 && start[i] < start[i - 1])
+			{
+				System.out.println("It doesn't sort by start");
+				System.exit(0);
+			}
+			if (end[i] > end[endindex])
+			{
+				endindex = i;
+			}
+		}
+
+		int enter = 0, currPosDist = 0;
+		int readsIndex = 0;
+
+		// 真正的pbwt处理过程，位置信息是从1开始的，所以说不可能是0
+		int pos = 0;
+		boolean emptyFlag = true;	// 用于监测collection是非为空
+		for (pos = start[0]; pos <= end[endindex]; pos++)
+		{
+			// 这了不明白，为什么不能够等于0呢，为什么需要这么处理呢
+			if (pos == 0)
+			{
+				pos = start[++enter] - 1;
+				continue;
+			}
+
+//			这里的目的就是为了初始化ak数组，这个顺序不能改
+			if(readsCurrList.isEmpty())
+			{
+				emptyFlag = true;
+			}
+			if (currPosDist == 0) // liyang：这里是每条新的序列才能够进行的，只有currposdist减到0,才能加入下一条序列
+			{
+				while (enter < end.length && start[enter] == pos) // 有新元素进队列的情形 liyang：这里这个设计非常的完美pos一直加，而currposdist一直减
+				{
+					readsCurrList.add(readsList.get(readsIndex++)); // liyang:序列从横向的排列变成了纵向的排列，把所有的开头位置一样的先存储一下
+					enter++;
+				}					
+				if (enter < end.length)
+				{
+					currPosDist = start[enter] - pos;
+				}
+			}
+			currPosDist--;
+
+//			如果不为空，进行下面操作。容器中有序列
+			ArrayList<Integer> listPbwt = new ArrayList<Integer>();
+			ArrayList<String> exception = new ArrayList<String>();
+			ArrayList<Integer> index = new ArrayList<>();
+			if(!readsCurrList.isEmpty())
+			{				
+				// 初始化操作，可能会出现多次初始化的情况
+				if(emptyFlag == true)
+				{
+					// 在这里进行初值化操作我认为比较合适
+					// 读取此时容器长度，然后依次遍历，将a0赋值
+					ArrayList<Integer> a0 = new ArrayList<>();
+					for(int i=0 ;i <readsCurrList.size(); i++)
+					{
+						a0.add(i);
+					}
+					indexes.add(a0);
+				}
+				// 应对插入更新问题
+				// 如果进行之前的初始化操作，这个if不会进入。
+				int maxSize = indexes.size()-1;	
+				int maxValue = indexes.get(maxSize).size()-1;
+				int difference = readsCurrList.size()-indexes.get(maxSize).size();
+				if (emptyFlag == false && difference > 0)
+				{
+					// 更新ak数组
+					for(int i=0; i<difference; i++)
+					{
+						maxValue+=1;
+						indexes.get(maxSize).add(maxValue);
+					}
+					
+				}
+				
+				emptyFlag = false;	// 只有第一次为空进这个循环才会执行这个操作，其他时候不进入
+				char curValQual = ' ';
+				int curValue = -1;
+				int curIndex = -1;
+				// 构造ak+1和k位点的dpbwt
+				for (int i = 0; i < readsCurrList.size(); i++)
+				{	
+					// 一条read上的相对位置，从0开始到最后length-1
+//					curVal = readsCurrList.get(i).getReads().get(pos - readsCurrList.get(i).getStartAlignment());
+					curValQual = 0; // 这里初值设置为0非常重要，应对是3的情况
+					
+					curIndex = indexes.get(indexes.size() - 1).get(i);
+					curValue = readsCurrList.get(curIndex).getReads()
+							.get(pos - readsCurrList.get(curIndex).getStartAlignment());
+					
+					if (curValue == 1 || curValue == 0)
+					{
+						curValQual = readsCurrList.get(curIndex).getReadQuality()
+								.charAt(pos - readsCurrList.get(curIndex).getStartAlignment());
+					}
+					
+					if (curValue == 0)
+					{
+						A.add(curIndex);
+						qualA.add(curValQual);
+						listPbwt.add(curValue);
+					}
+					else if (curValue == 1)
+					{
+						B.add(curIndex);
+						listPbwt.add(curValue);
+//						System.out.println(pos);
+//						exception.add(readsCurrList.get(curIndex).getException().get(0));
+						exception2.add(readsCurrList.get(curIndex).getException().get(0));
+//						exBackUp.add(readsCurrList.get(curIndex).getException().get(0));
+						readsCurrList.get(curIndex).getException().remove(0);
+//						exceptionQual.add(curValQual);
+						qualB.add(curValQual);
+//						exListLength++;
+					}
+					else
+					{
+						C.add(curIndex);
+						listPbwt.add(ReadElemEnum.END.ordinal());
+					}
+					
+				}
+
+				for (Integer ins : A)
+				{
+					index.add(ins);
+				}
+				for (Integer ins : B)
+				{
+					index.add(ins);
+				}
+				
+				// 异常值加入
+//				if (!exception.isEmpty())
+//				{
+//					exceptionList.add(exception);
+//				}
+				// read序列加入
+				listsPBWT.add(listPbwt);
+				// 正常质量分数加入
+				// 这里应该先是稀疏化处理，然后才是均质化处理，
+				// 这里丢给质量分数处理函数，处理。应该是单步在这里进行完成的
+				int avg = 0;
+				int Exavg = 0;
+				for (Character chr : qualA)
+				{
+					avg += chr;
+				}
+				// 这里注意，如果是大小为0的话，也需要加上一个0，站住这个位置
+				if (qualA.size() != 0)
+				{
+					listsPbwtQual.add((char) (avg / qualA.size()));
+				} 
+				for (Character chr : qualB)
+				{
+					Exavg += chr;
+				}
+				if (qualB.size() != 0)
+				{
+					exceptionQual.add((char) (Exavg / qualB.size()));
+				}
+
+				a.clear();
+				b.clear();
+				c.clear();
+				A.clear();
+				B.clear();
+//				C.clear();
+				qualA.clear();
+				qualB.clear();
+				// 这里是一个移除操作，因为每次都要删除第一个，所以需要不断的偏移求相对位置
+				// 这里改一下，删除更新，更新ak+1这个数组
+				int offset = 0;
+				int tempIndex = -1;
+				Collections.sort(C);
+				for (Integer ins : C)
+				{
+					readsCurrList.remove(ins - offset); // 删除序列
+					for (int i = 0; i < index.size(); i++)
+					{
+						if ((ins - offset) <= index.get(i))
+						{
+							tempIndex = index.get(i) - 1;
+							index.set(i, tempIndex);
+						}
+						// else if(ins == index.get(i))
+						// {
+						// index.remove(i);
+						// i--;
+						// }
+						else
+						{
+							// 什么也不做
+						}
+					}
+					offset++;
+				}
+				C.clear();
+				if(!index.isEmpty())
+				{
+					indexes.add(index);
+				}
+				
+			}
+			// 这里添加出现gap的情况,异常值，异常分数都是空，但是正常质量分数这里需要设置为null
+			else
+			{
+//				listPbwt.add(2);
+				indexes.add(index);
+				listsPBWT.add(listPbwt);
+//				listsPbwtQual.add(null);
+//				exceptionListQual.add(exceptionQual);
+//				exceptionList.add(exception);
+				
+			}
+			readsQualLength++;
+
+		}
+		tempIndexes = indexes;	// 先这样最简单化处理
+		result.setListsPBWT(listsPBWT);
+		result.setListsQual(listsPbwtQual);
+		result.setListExQual2(exceptionQual);
+//		result.setListsExcep(exceptionList);
+		result.setListsExcep2(exception2);
+		result.setIndexes(indexes); // indexes应该单独加入，因为之后修改不会全部保存
+//		System.out.println("listsPBWT size:"+result.getListsPBWT().size());
+		System.out.println("\n"+"pos:"+(pos-start[0]));
+		System.out.println();
+		System.out.println("Original PBWT(pbwtResult.length):\t");
+		// for(int i=0; i<listsPBWT.size(); i++)
+		// {
+		// System.out.println(listsPBWT.get(i).toString());
+		// }
+
+		return result;
+	}
+
 	
 	private ReadPbwtResult PBWTAlgo(ArrayList<ReadStruct> readsList, int[] start, int[] end)
 	{
@@ -4131,19 +5204,21 @@ public class MainEncoding2
 		return array;
 	}
 
-	public static byte[] EncodeExceptionList2(ArrayList<ArrayList<String>> vE)
+	/**
+	 * 全局压缩，异常值为一维
+	 * @param vE
+	 * @return
+	 */
+	public static byte[] EncodeExceptionList2(List<String> vE)
 	{
-		ArrayList<ArrayList<String>> exceptionList = vE;
+		List<String> exceptionList = vE;
 		Huffman2 huffman = new Huffman2();
 		String rateText = "AAACCCTTTGGG||DN";
 		huffman.handleRate(rateText);
 		StringBuilder rawText = new StringBuilder();
-		for (ArrayList<String> str : exceptionList)
+		for (String str : exceptionList)
 		{
-			for (int i = 0; i < str.size(); i++)
-			{
-				rawText.append(str.get(i) + "|");
-			}
+			rawText.append(str + "|");
 		}
 		String[] str = Huffman2.encodeText2(rawText.toString());
 
@@ -4158,19 +5233,6 @@ public class MainEncoding2
 			}
 			length = i + 1;
 		}
-//		System.out.println("huffman length \t" + length);
-		// System.out.println();
-		// System.out.println("length : "+length);
-//		for (ArrayList<String> ar : exceptionList)
-//		{
-//			for (String str1 : ar)
-//			{
-//				System.out.print(str1 + "  ");
-//			}
-//			System.out.println();
-//		}
-//		System.out.println();
-		// System.out.println(length);
 
 		ByteBuffer bytes = ByteBuffer.allocate(length * 2); // liyang:开辟双倍内存，short占用两个字节
 		for (int i = 0; i < length - 1; i++)
@@ -4198,11 +5260,11 @@ public class MainEncoding2
 		return array;
 	}
 
-/**
- * 适用于插入压缩，引入符号‘，’进行内部区分，空的位置加上‘|’
- * @param vE
- * @return
- */
+	/**
+	 * 适用于插入压缩，引入符号‘，’进行内部区分，空的位置加上‘|’
+	 * @param vE
+	 * @return
+	 */
 	public static byte[] EncodeExceptionList3(ArrayList<ArrayList<String>> vE)
 	{
 		ArrayList<ArrayList<String>> exceptionList = vE;
@@ -4375,7 +5437,7 @@ public class MainEncoding2
 		return str;
 	}
 
-	private char TranforOr(char ch)
+	private static char TranforOr(char ch)
 	{
 		Random random = new Random();
 		char temp;
@@ -4409,6 +5471,11 @@ public class MainEncoding2
 
 	}
 
+	/**
+	 * 用于压缩全部的起始位点信息,同时也可以压缩MinStart
+	 * @param start
+	 * @return
+	 */
 	private static byte[] compressStartPos(int[] start)
 	{
 		// 写一个求相对位置的函数
@@ -4489,7 +5556,63 @@ public class MainEncoding2
 		return startPos;
 	}
 
+	/**
+	 * 适用于全局压缩
+	 * @param startPos
+	 * @return
+	 */
 	private static int[] deStartPos(byte[] startPos)
+	{
+		int deStart = deCompressLen(Arrays.copyOf(startPos, 4));
+		int deFlag = startPos[startPos.length - 1] & 0xff;
+		int len = (startPos.length - 5) / deFlag + 1;
+		int deS[] = new int[len];
+		deS[0] = deStart;
+		System.out.println("\n" + " deStart: " + deStart + " deFlag: " + deFlag);
+		int index = 1;
+		if (deFlag == 1)
+		{
+			for (int i = 4; i < startPos.length - 1; i++)
+			{
+				deS[index] = (startPos[i] & 0xff) + deS[index - 1];
+				// System.out.print(deS[index-1]+" "+deS[index]+" "+(startPos[i] & 0xff)+"\t");
+				index++;
+			}
+		} else if (deFlag == 2)
+		{
+			for (int i = 4; i < startPos.length - 1; i = i + 2)
+			{
+				deS[index] = ((startPos[i] & 0xff) * 256 + (startPos[i + 1] & 0xff)) + deS[index - 1];
+				// System.out.print(deS[index-1]+" "+deS[index]+" "+((startPos[i]&0xff)*256 +
+				// (startPos[i+1]&0xff))+"\t");
+				index++;
+			}
+		} else if (deFlag == 3)
+		{
+			for (int i = 4; i < startPos.length - 1; i = i + 3)
+			{
+				deS[index] = ((startPos[i] & 0xff) * 65536 + (startPos[i + 1] & 0xff) * 256 + (startPos[i + 2] & 0xff))
+						+ deS[index - 1];
+				index++;
+			}
+		} else
+		{
+			for (int i = 4; i < startPos.length - 1; i = i + 4)
+			{
+				deS[index] = ((startPos[i] & 0xff) * 16777216 + (startPos[i + 1] & 0xff) * 65536
+						+ (startPos[i + 3] & 0xff) * 256 + (startPos[i + 4] & 0xff)) + deS[index - 1];
+				index++;
+			}
+		}
+		return deS;
+	}
+
+	/**
+	 * 适用于局部压缩MinStart
+	 * @param startPos
+	 * @return
+	 */
+	private static int[] deStartPos2(byte[] startPos)
 	{
 		int deStart = deCompressLen(Arrays.copyOf(startPos, 4));
 		int deFlag = startPos[startPos.length - 1] & 0xff;
@@ -4598,5 +5721,1254 @@ public class MainEncoding2
 	       return nFreeMemory + "M/" + nTotalMemory + "M/" + nMaxMemory + "M(free/total/Max)" ;
 	    }
 
+	 /**
+	  * 局部解压缩，显示操作
+	  * @param start
+	  * @param minStart
+	  * @param readsResult
+	  */
+	private static ArrayList<ArrayList<Integer>> DecodeTPBWT(AuxiliaryInfo count, int minStart, byte[] byteKV)
+	{
+		ArrayList<ArrayList<Integer>> reListsPBWT = new ArrayList<ArrayList<Integer>>();
+		ArrayList<Integer> pbwt = new ArrayList<Integer>();
+		
+		int curPos = 0;
+		int difference = 0;
+		int KVlen = 0;
+		int tempByte = 0;
+		int tempByte2 = 0;
+		int value = -1;
+		int key = -1;
+		int lenFlag = -1;
+		int lastkey = -1;
+		boolean oneFlag = false;
+		boolean zeroFlag =false;
+		if (count.start <= minStart)
+		{
+			count.realstart = minStart;
+			// 这种情况起始的count都是0，特殊写一下起始没有必要
+//			count.rowReadsCount = 0;
+			count.exCount = 0;
+			count.QualCount = 0;
+			count.exQualCount = 0;
+			int i = 0;
+			KVlen = byteKV.length;
+			curPos = minStart;
+			difference = count.end - curPos + 1;
+			while (difference > 0 && KVlen > 0)
+			{
+				tempByte = byteKV[i] + 128;
+				key = (tempByte >> 6)%4;
+				if (key == 2)
+				{
+					value = (tempByte >> 4)%4;
+					// 暂时还没确定2的存储格式
+//					lenFlag = (tempByte >> 5)%2;
+//					if (lenFlag == 1)
+//					{
+//						i++;
+//						KVlen--;
+//					}
+					if (value == 1)
+					{
+						// 0,1混合或者空或者全是3
+						if (zeroFlag && oneFlag)
+						{
+							// 0,1混合情况
+							count.QualCount++;
+							count.exCount++;
+							count.exQualCount++;
+						}
+						else if (lastkey!=2)
+						{
+							// 上一个value不是2说明该列不为空
+							// 暂时认为情况一样
+							// 为3情况
+							// 所有计数器不变
+						}
+						else
+						{
+							// 上述条件一个都不满足
+							// 为空情况
+							// 所有计数器不变
+						}
+						
+					}
+					else if (value == 2)
+					{
+						// 全是0的情况
+						count.QualCount++;
+					}
+					else
+					{
+						// 全是1的情况
+						count.exCount++;
+						count.exQualCount++;
+					}
+//					count.rowReadsCount++; // 遇到2就自增1
+					difference--;
+					reListsPBWT.add(pbwt);
+					pbwt = new ArrayList<>();
+					zeroFlag = false;
+					oneFlag = false;
+				}
+				else
+				{
+					if (!zeroFlag && key == 0)
+					{
+						zeroFlag = true;
+					}
+					else if (!oneFlag && key == 1)
+					{
+						oneFlag = true;
+					}
+					else {
+						// 为三的情况
+					}
+					lenFlag = (tempByte >> 5)%2;
+					if (lenFlag == 1)
+					{
+						i++;
+						KVlen--;
+						tempByte2 = byteKV[i] + 128;
+						value = tempByte%32*256 + tempByte2; // 这里稍有问题，暂时这样
+					}
+					else 
+					{
+						value = tempByte%32;
+					}
+					// 0,1,3情况转换为RL
+					while(value--> 0) 
+					{
+						pbwt.add(key);
+					}
+				}
+				lastkey = key;
+				KVlen--;
+				i++;
+			}
+		}
+		else
+		{
+			count.realstart = count.start;
+			curPos = count.start;
+			difference = count.start - minStart;
+			int i = 0;
+//			int readsCount = 0;
+			KVlen = byteKV.length;
+			// 在curpos之前的不存储，只是简单的存储起始的count
+			while(KVlen>0)
+			{
+				if (difference>0)
+				{
+					tempByte = byteKV[i] + 128;
+					key = (tempByte >> 6)%4;
+					if (key == 2)
+					{
+						value = (tempByte >> 4)%4;
+//						lenFlag = (tempByte >> 5)%2;
+//						if (lenFlag == 1)
+//						{
+//							i++;
+//							KVlen--;
+//						}
+						if (value == 1)
+						{
+							// 0,1混合或者空或者全是3
+							if (zeroFlag && oneFlag)
+							{
+								// 0,1混合情况
+								count.QualCount++;
+								count.exCount++;
+								count.exQualCount++;
+							}
+							else if (lastkey!=2)
+							{
+								// 上一个value不是2说明该列不为空
+								// 暂时认为情况一样
+								// 为3情况
+								// 所有计数器不变
+							}
+							else
+							{
+								// 上述条件一个都不满足
+								// 为空情况
+								// 所有计数器不变
+							}
+							
+						}
+						else if (value == 2)
+						{
+							// 全是0的情况
+							count.QualCount++;
+						}
+						else
+						{
+							// 全是1的情况
+							count.exCount++;
+							count.exQualCount++;
+						}
+//						readsCount++;
+						difference--;
+						zeroFlag = false;
+						oneFlag = false;
+					}
+					else
+					{
+						if (!zeroFlag && key == 0)
+						{
+							zeroFlag = true;
+						}
+						else if (!oneFlag && key == 1)
+						{
+							oneFlag = true;
+						}
+						else {
+							// 为三的情况
+						}
+						lenFlag = (tempByte >> 5)%2;
+						if (lenFlag == 1)
+						{
+							i++;
+							KVlen--;
+							tempByte2 = byteKV[i] + 128;
+							value = tempByte%32*256 + tempByte2; // 这里稍有问题，暂时这样
+						}
+						else 
+						{
+							value = tempByte%32;
+						}
+						// 0,1,3情况转换为RL
+//						while(value--> 0) 
+//						{
+//							pbwt.add(key);
+//						}
+					}
+					lastkey = key;
+					KVlen--;
+					i++;
+				}
+				else
+				{
+					// 针对difference小于0的情况，也就是进入了需要显示的区域内
+//					count.endRowReadsCount = count.rowReadsCount;
+					count.endExCount = count.exCount;
+					count.endQualCount = count.QualCount;
+					count.endExQualCount = count.endExQualCount;
+					while(count.end-curPos+difference>=0&&KVlen>0)
+					{
+						tempByte = byteKV[i] + 128;
+						key = (tempByte >> 6)%4;
+						if (key == 2)
+						{
+							value = (tempByte >> 4)%4;
+//							lenFlag = (tempByte >> 5)%2;
+//							if (lenFlag == 1)
+//							{
+//								i++;
+//								KVlen--;
+//							}
+							if (value == 1)
+							{
+								// 0,1混合或者空或者全是3
+								if (zeroFlag && oneFlag)
+								{
+									// 0,1混合情况
+									count.endQualCount++;
+									count.endExCount++;
+									count.endExQualCount++;
+//									count.QualCount++;
+//									count.exCount++;
+//									count.exQualCount++;
+								}
+								else if (lastkey!=2)
+								{
+									// 上一个value不是2说明该列不为空
+									// 暂时认为情况一样
+									// 为3情况
+									// 所有计数器不变
+									
+								}
+								else
+								{
+									// 上述条件一个都不满足
+									// 为空情况
+									// 所有计数器不变
+									
+								}
+								
+							}
+							else if (value == 2)
+							{
+								// 全是0的情况
+//								count.QualCount++;
+								count.endQualCount++;
+							}
+							else
+							{
+								// 全是1的情况
+//								count.exCount++;
+//								count.exQualCount++;
+								count.endExCount++;
+								count.endExQualCount++;
+							}
+//							count.endRowReadsCount++;
+							difference--;
+							reListsPBWT.add(pbwt);
+							pbwt = new ArrayList<>();
+							zeroFlag = false;
+							oneFlag = false;
+						}
+						else
+						{
+							if (!zeroFlag && key == 0)
+							{
+								zeroFlag = true;
+							}
+							else if (!oneFlag && key == 1)
+							{
+								oneFlag = true;
+							}
+							else {
+								// 为三的情况
+							}
+							lenFlag = (tempByte >> 5)%2;
+							if (lenFlag == 1)
+							{
+								i++;
+								KVlen--;
+								tempByte2 = byteKV[i] + 128;
+								value = tempByte%32*256 + tempByte2; // 这里稍有问题，暂时这样
+							}
+							else 
+							{
+								value = tempByte%32;
+							}
+							// 0,1,3情况转换为RL
+							while(value--> 0) 
+							{
+								pbwt.add(key);
+							}
+						}
+						lastkey = key;
+						KVlen--;
+						i++;
+					}
+					break;
+				}
+			}
+			// 当kvlen小于等于0说明start小于整个区间的maxend，输出为空
+		}
+	
+		return reListsPBWT;
+	}
+	
+	/**
+	 * 用于局部显示
+	 * @param count
+	 * @param exceptionResult
+	 * @return
+	 */
+	private static ArrayList<ArrayList<String>> deEncodeExceptionList(AuxiliaryInfo count, byte[] exceptionResult)
+	{
+		String byte2EncodeResult = "";
+		String tempbyte2 = "";
+		int num = 0;
+		for (int i = 0; i < exceptionResult.length - 2; i++)
+		{
+			if (exceptionResult[i] == ' ')
+			{
+				break;
+			}
+			tempbyte2 = String.format("%8s", Integer.toBinaryString(exceptionResult[i] & 0xFF)).replace(' ', '0');
+
+//			num++;
+//			if (num % 2 == 1)
+//			{
+//				System.out.print(tempbyte2);
+//			} else
+//			{
+//				System.out.println(tempbyte2);
+//			}
+			byte2EncodeResult += tempbyte2;
+		}
+
+		String strTail = String.format("%8s", Integer.toBinaryString(exceptionResult[exceptionResult.length - 2] & 0xFF)).replace(' ', '0')
+				+ String.format("%8s", Integer.toBinaryString(exceptionResult[exceptionResult.length - 1] & 0xFF)).replace(' ', '0');
+		System.out.println(strTail);
+		byte2EncodeResult += strTail;
+		Huffman2 huffman = new Huffman2();
+		String rateText = "AAACCCTTTGGG||DN";
+		huffman.handleRate(rateText);
+
+		String decodedResult = huffman.decodeText(byte2EncodeResult); // bit还原为String
+		String decodeResult2 = decodedResult.substring(0, decodedResult.lastIndexOf("|")); // 去掉最后的结尾
+		// decodeResult2+="|"; // 这里可能会影响速度，之后再改
+
+		ArrayList<ArrayList<String>> deResult = new ArrayList<ArrayList<String>>();
+		String[] deTemp = decodeResult2.split("\\|",-1);
+		// 点隔开这里明天继续,注意空的问题
+		ArrayList<String> templist = new ArrayList<String>();
+		for (String str : deTemp)
+		{
+			if (!str.isEmpty())
+			{
+				templist.add(str);
+			}
+			else
+			{
+				if (num>=count.exCount&&num<=count.endExCount)
+				{
+					deResult.add(templist);
+				}
+				templist = new ArrayList<String>();
+				num++;
+			}
+		}
+
+		return deResult;
+	}
+	
+	/**
+	 * 适用于正常质量分数局部显示
+	 * @param count
+	 * @param readQuaReasult
+	 * @return
+	 */
+	private static ArrayList<Character> deEncodeQual(AuxiliaryInfo count, byte[] readQuaReasult)
+	{
+		ArrayList<Character> dexQual2 = new ArrayList<>();
+		char[] deStr = new char[8];
+		int startNum = 0;
+		int startNumRe = 0;
+		int endNum = 0;
+		int endNumRe = 0;
+		
+		startNum = (count.QualCount+1)/8;
+		startNumRe = (count.QualCount+1)%8;
+		endNum = count.endQualCount/8;
+		endNumRe = count.endQualCount%8;
+		
+		for (int i = startNum; i <= endNum; i++)
+		{
+			if (i == startNum)
+			{
+				if (startNum == endNum)
+				{
+					for (int j = startNumRe; j <=endNumRe; j++)
+					{
+						switch (j)
+						{
+						case 0:
+							deStr[0] = (char) ((byte) ((((readQuaReasult[i*3] + 128) & 0xff) >> 5) % 8) + 48);
+							dexQual2.add(TranforOr(deStr[0]));
+							break;
+						case 1:
+							deStr[1] = (char) ((byte) (((readQuaReasult[i*3] & 0xff) >> 2) % 8) + 48);
+							dexQual2.add(TranforOr(deStr[1]));
+							break;
+						case 2:
+							deStr[2] = (char) ((byte) ((((readQuaReasult[i*3] & 0xff) % 4) * 2)
+									+ ((((readQuaReasult[i*3 + 1] + 128) & 0xff) >> 7) % 2)) + 48);
+							dexQual2.add(TranforOr(deStr[2]));
+							break;
+						case 3:
+							deStr[3] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 4) % 8) + 48);
+							dexQual2.add(TranforOr(deStr[3]));
+							break;
+						case 4:
+							deStr[4] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 1) % 8) + 48);
+							dexQual2.add(TranforOr(deStr[4]));
+							break;
+						case 5:
+							deStr[5] = (char) ((byte) ((((readQuaReasult[i*3 + 1] & 0xff) % 2) * 4)
+									+ ((((readQuaReasult[i*3 + 2] + 128) & 0xff) >> 6) % 4)) + 48);
+							dexQual2.add(TranforOr(deStr[5]));
+							break;
+						case 6:
+							deStr[6] = (char) ((byte) (((readQuaReasult[i*3 + 2] & 0xff) >> 3) % 8) + 48);
+							dexQual2.add(TranforOr(deStr[6]));
+							break;
+						case 7:
+							deStr[7] = (char) ((byte) ((readQuaReasult[i*3 + 2] & 0xff) % 8) + 48);
+							dexQual2.add(TranforOr(deStr[7]));
+							break;
+						default:
+							break;
+						}
+					}
+				}
+				else 
+				{
+					// 这里需要根据 startNumRe来判断到底存几个，用switch
+					switch (startNumRe)
+					{
+					case 0:
+						// 并非是一个没有，而是第一个全部加入
+						deStr[0] = (char) ((byte) ((((readQuaReasult[i*3] + 128) & 0xff) >> 5) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[0]));
+						deStr[1] = (char) ((byte) (((readQuaReasult[i*3] & 0xff) >> 2) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[1]));
+						deStr[2] = (char) ((byte) ((((readQuaReasult[i*3] & 0xff) % 4) * 2)
+								+ ((((readQuaReasult[i*3 + 1] + 128) & 0xff) >> 7) % 2)) + 48);
+						dexQual2.add(TranforOr(deStr[2]));
+						deStr[3] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 4) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[3]));
+						deStr[4] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 1) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[4]));
+						deStr[5] = (char) ((byte) ((((readQuaReasult[i*3 + 1] & 0xff) % 2) * 4)
+								+ ((((readQuaReasult[i*3 + 2] + 128) & 0xff) >> 6) % 4)) + 48);
+						dexQual2.add(TranforOr(deStr[5]));
+						deStr[6] = (char) ((byte) (((readQuaReasult[i*3 + 2] & 0xff) >> 3) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[6]));
+						deStr[7] = (char) ((byte) ((readQuaReasult[i*3 + 2] & 0xff) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[7]));
+						break;
+					case 1:
+						deStr[1] = (char) ((byte) (((readQuaReasult[i*3] & 0xff) >> 2) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[1]));
+						deStr[2] = (char) ((byte) ((((readQuaReasult[i*3] & 0xff) % 4) * 2)
+								+ ((((readQuaReasult[i*3 + 1] + 128) & 0xff) >> 7) % 2)) + 48);
+						dexQual2.add(TranforOr(deStr[2]));
+						deStr[3] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 4) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[3]));
+						deStr[4] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 1) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[4]));
+						deStr[5] = (char) ((byte) ((((readQuaReasult[i*3 + 1] & 0xff) % 2) * 4)
+								+ ((((readQuaReasult[i*3 + 2] + 128) & 0xff) >> 6) % 4)) + 48);
+						dexQual2.add(TranforOr(deStr[5]));
+						deStr[6] = (char) ((byte) (((readQuaReasult[i*3 + 2] & 0xff) >> 3) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[6]));
+						deStr[7] = (char) ((byte) ((readQuaReasult[i*3 + 2] & 0xff) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[7]));
+						break;
+					case 2:
+						deStr[2] = (char) ((byte) ((((readQuaReasult[i*3] & 0xff) % 4) * 2)
+								+ ((((readQuaReasult[i*3 + 1] + 128) & 0xff) >> 7) % 2)) + 48);
+						dexQual2.add(TranforOr(deStr[2]));
+						deStr[3] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 4) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[3]));
+						deStr[4] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 1) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[4]));
+						deStr[5] = (char) ((byte) ((((readQuaReasult[i*3 + 1] & 0xff) % 2) * 4)
+								+ ((((readQuaReasult[i*3 + 2] + 128) & 0xff) >> 6) % 4)) + 48);
+						dexQual2.add(TranforOr(deStr[5]));
+						deStr[6] = (char) ((byte) (((readQuaReasult[i*3 + 2] & 0xff) >> 3) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[6]));
+						deStr[7] = (char) ((byte) ((readQuaReasult[i*3 + 2] & 0xff) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[7]));
+						break;
+					case 3:
+						deStr[3] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 4) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[3]));
+						deStr[4] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 1) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[4]));
+						deStr[5] = (char) ((byte) ((((readQuaReasult[i*3 + 1] & 0xff) % 2) * 4)
+								+ ((((readQuaReasult[i*3 + 2] + 128) & 0xff) >> 6) % 4)) + 48);
+						dexQual2.add(TranforOr(deStr[5]));
+						deStr[6] = (char) ((byte) (((readQuaReasult[i*3 + 2] & 0xff) >> 3) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[6]));
+						deStr[7] = (char) ((byte) ((readQuaReasult[i*3 + 2] & 0xff) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[7]));
+						break;
+					case 4:
+						deStr[4] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 1) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[4]));
+						deStr[5] = (char) ((byte) ((((readQuaReasult[i*3 + 1] & 0xff) % 2) * 4)
+								+ ((((readQuaReasult[i*3 + 2] + 128) & 0xff) >> 6) % 4)) + 48);
+						dexQual2.add(TranforOr(deStr[5]));
+						deStr[6] = (char) ((byte) (((readQuaReasult[i*3 + 2] & 0xff) >> 3) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[6]));
+						deStr[7] = (char) ((byte) ((readQuaReasult[i*3 + 2] & 0xff) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[7]));
+						break;
+					case 5:
+						deStr[5] = (char) ((byte) ((((readQuaReasult[i*3 + 1] & 0xff) % 2) * 4)
+								+ ((((readQuaReasult[i*3 + 2] + 128) & 0xff) >> 6) % 4)) + 48);
+						dexQual2.add(TranforOr(deStr[5]));
+						deStr[6] = (char) ((byte) (((readQuaReasult[i*3 + 2] & 0xff) >> 3) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[6]));
+						deStr[7] = (char) ((byte) ((readQuaReasult[i*3 + 2] & 0xff) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[7]));
+						break;
+					case 6:
+						deStr[6] = (char) ((byte) (((readQuaReasult[i*3 + 2] & 0xff) >> 3) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[6]));
+						deStr[7] = (char) ((byte) ((readQuaReasult[i*3 + 2] & 0xff) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[7]));
+						break;
+					case 7:
+						deStr[7] = (char) ((byte) ((readQuaReasult[i*3 + 2] & 0xff) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[7]));
+						break;
+					default:
+						break;
+					}
+				}
+				
+			}
+			else if (i == endNum)
+			{
+				switch (endNumRe)
+				{
+				case 0:
+					// 剩余0个，对于最大范围不会超出，因为qualcount最大表示也是byte的范围
+					break;
+				case 1:
+					deStr[0] = (char) ((byte) ((((readQuaReasult[i*3] + 128) & 0xff) >> 5) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[0]));
+					break;
+				case 2:
+					deStr[0] = (char) ((byte) ((((readQuaReasult[i*3] + 128) & 0xff) >> 5) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[0]));
+					deStr[1] = (char) ((byte) (((readQuaReasult[i*3] & 0xff) >> 2) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[1]));
+					break;
+				case 3:
+					deStr[0] = (char) ((byte) ((((readQuaReasult[i*3] + 128) & 0xff) >> 5) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[0]));
+					deStr[1] = (char) ((byte) (((readQuaReasult[i*3] & 0xff) >> 2) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[1]));
+					deStr[2] = (char) ((byte) ((((readQuaReasult[i*3] & 0xff) % 4) * 2)
+							+ ((((readQuaReasult[i*3 + 1] + 128) & 0xff) >> 7) % 2)) + 48);
+					dexQual2.add(TranforOr(deStr[2]));
+					break;
+				case 4:
+					deStr[0] = (char) ((byte) ((((readQuaReasult[i*3] + 128) & 0xff) >> 5) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[0]));
+					deStr[1] = (char) ((byte) (((readQuaReasult[i*3] & 0xff) >> 2) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[1]));
+					deStr[2] = (char) ((byte) ((((readQuaReasult[i*3] & 0xff) % 4) * 2)
+							+ ((((readQuaReasult[i*3 + 1] + 128) & 0xff) >> 7) % 2)) + 48);
+					dexQual2.add(TranforOr(deStr[2]));
+					deStr[3] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 4) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[3]));
+					break;
+				case 5:
+					deStr[0] = (char) ((byte) ((((readQuaReasult[i*3] + 128) & 0xff) >> 5) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[0]));
+					deStr[1] = (char) ((byte) (((readQuaReasult[i*3] & 0xff) >> 2) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[1]));
+					deStr[2] = (char) ((byte) ((((readQuaReasult[i*3] & 0xff) % 4) * 2)
+							+ ((((readQuaReasult[i*3 + 1] + 128) & 0xff) >> 7) % 2)) + 48);
+					dexQual2.add(TranforOr(deStr[2]));
+					deStr[3] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 4) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[3]));
+					deStr[4] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 1) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[4]));
+					break;
+				case 6:
+					deStr[0] = (char) ((byte) ((((readQuaReasult[i*3] + 128) & 0xff) >> 5) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[0]));
+					deStr[1] = (char) ((byte) (((readQuaReasult[i*3] & 0xff) >> 2) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[1]));
+					deStr[2] = (char) ((byte) ((((readQuaReasult[i*3] & 0xff) % 4) * 2)
+							+ ((((readQuaReasult[i*3 + 1] + 128) & 0xff) >> 7) % 2)) + 48);
+					dexQual2.add(TranforOr(deStr[2]));
+					deStr[3] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 4) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[3]));
+					deStr[4] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 1) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[4]));
+					deStr[5] = (char) ((byte) ((((readQuaReasult[i*3 + 1] & 0xff) % 2) * 4)
+							+ ((((readQuaReasult[i*3 + 2] + 128) & 0xff) >> 6) % 4)) + 48);
+					dexQual2.add(TranforOr(deStr[5]));
+					break;
+				case 7:
+					deStr[0] = (char) ((byte) ((((readQuaReasult[i*3] + 128) & 0xff) >> 5) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[0]));
+					deStr[1] = (char) ((byte) (((readQuaReasult[i*3] & 0xff) >> 2) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[1]));
+					deStr[2] = (char) ((byte) ((((readQuaReasult[i*3] & 0xff) % 4) * 2)
+							+ ((((readQuaReasult[i*3 + 1] + 128) & 0xff) >> 7) % 2)) + 48);
+					dexQual2.add(TranforOr(deStr[2]));
+					deStr[3] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 4) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[3]));
+					deStr[4] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 1) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[4]));
+					deStr[5] = (char) ((byte) ((((readQuaReasult[i*3 + 1] & 0xff) % 2) * 4)
+							+ ((((readQuaReasult[i*3 + 2] + 128) & 0xff) >> 6) % 4)) + 48);
+					dexQual2.add(TranforOr(deStr[5]));
+					deStr[6] = (char) ((byte) (((readQuaReasult[i*3 + 2] & 0xff) >> 3) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[6]));
+					break;
+				default:
+					break;
+				}
+			}
+			else
+			{
+				// 永远不可能是最后，这是中间过程
+				deStr[0] = (char) ((byte) ((((readQuaReasult[i*3] + 128) & 0xff) >> 5) % 8) + 48);
+				dexQual2.add(TranforOr(deStr[0]));
+				deStr[1] = (char) ((byte) (((readQuaReasult[i*3] & 0xff) >> 2) % 8) + 48);
+				dexQual2.add(TranforOr(deStr[1]));
+				deStr[2] = (char) ((byte) ((((readQuaReasult[i*3] & 0xff) % 4) * 2)
+						+ ((((readQuaReasult[i*3 + 1] + 128) & 0xff) >> 7) % 2)) + 48);
+				dexQual2.add(TranforOr(deStr[2]));
+				deStr[3] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 4) % 8) + 48);
+				dexQual2.add(TranforOr(deStr[3]));
+				deStr[4] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 1) % 8) + 48);
+				dexQual2.add(TranforOr(deStr[4]));
+				deStr[5] = (char) ((byte) ((((readQuaReasult[i*3 + 1] & 0xff) % 2) * 4)
+						+ ((((readQuaReasult[i*3 + 2] + 128) & 0xff) >> 6) % 4)) + 48);
+				dexQual2.add(TranforOr(deStr[5]));
+				deStr[6] = (char) ((byte) (((readQuaReasult[i*3 + 2] & 0xff) >> 3) % 8) + 48);
+				dexQual2.add(TranforOr(deStr[6]));
+				deStr[7] = (char) ((byte) ((readQuaReasult[i*3 + 2] & 0xff) % 8) + 48);
+				dexQual2.add(TranforOr(deStr[7]));
+			}
+		}
+		
+		return dexQual2;
+
+	}
+	
+	/**
+	 * 适用于异常质量分数局部显示
+	 * @param count
+	 * @param readQuaReasult
+	 * @return
+	 */
+	private static ArrayList<Character> deEncodeExQual(AuxiliaryInfo count, byte[] readQuaReasult)
+	{
+		ArrayList<Character> dexQual2 = new ArrayList<>();
+		char[] deStr = new char[8];
+		int startNum = 0;
+		int startNumRe = 0;
+		int endNum = 0;
+		int endNumRe = 0;
+		
+		startNum = (count.exQualCount+1)/8;
+		startNumRe = (count.exQualCount+1)%8;
+		endNum = count.endExQualCount/8;
+		endNumRe = count.endExQualCount%8;
+		
+		for (int i = startNum; i <= endNum; i++)
+		{
+			if (i == startNum)
+			{
+				if (startNum == endNum)
+				{
+					for (int j = startNumRe; j <=endNumRe; j++)
+					{
+						switch (j)
+						{
+						case 0:
+							deStr[0] = (char) ((byte) ((((readQuaReasult[i*3] + 128) & 0xff) >> 5) % 8) + 48);
+							dexQual2.add(TranforOr(deStr[0]));
+							break;
+						case 1:
+							deStr[1] = (char) ((byte) (((readQuaReasult[i*3] & 0xff) >> 2) % 8) + 48);
+							dexQual2.add(TranforOr(deStr[1]));
+							break;
+						case 2:
+							deStr[2] = (char) ((byte) ((((readQuaReasult[i*3] & 0xff) % 4) * 2)
+									+ ((((readQuaReasult[i*3 + 1] + 128) & 0xff) >> 7) % 2)) + 48);
+							dexQual2.add(TranforOr(deStr[2]));
+							break;
+						case 3:
+							deStr[3] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 4) % 8) + 48);
+							dexQual2.add(TranforOr(deStr[3]));
+							break;
+						case 4:
+							deStr[4] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 1) % 8) + 48);
+							dexQual2.add(TranforOr(deStr[4]));
+							break;
+						case 5:
+							deStr[5] = (char) ((byte) ((((readQuaReasult[i*3 + 1] & 0xff) % 2) * 4)
+									+ ((((readQuaReasult[i*3 + 2] + 128) & 0xff) >> 6) % 4)) + 48);
+							dexQual2.add(TranforOr(deStr[5]));
+							break;
+						case 6:
+							deStr[6] = (char) ((byte) (((readQuaReasult[i*3 + 2] & 0xff) >> 3) % 8) + 48);
+							dexQual2.add(TranforOr(deStr[6]));
+							break;
+						case 7:
+							deStr[7] = (char) ((byte) ((readQuaReasult[i*3 + 2] & 0xff) % 8) + 48);
+							dexQual2.add(TranforOr(deStr[7]));
+							break;
+						default:
+							break;
+						}
+					}
+				}
+				else
+				{
+					// 这里需要根据 startNumRe来判断到底存几个，用switch
+					switch (startNumRe)
+					{
+					case 0:
+						// 并非是一个没有，而是第一个全部加入
+						deStr[0] = (char) ((byte) ((((readQuaReasult[i*3] + 128) & 0xff) >> 5) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[0]));
+						deStr[1] = (char) ((byte) (((readQuaReasult[i*3] & 0xff) >> 2) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[1]));
+						deStr[2] = (char) ((byte) ((((readQuaReasult[i*3] & 0xff) % 4) * 2)
+								+ ((((readQuaReasult[i*3 + 1] + 128) & 0xff) >> 7) % 2)) + 48);
+						dexQual2.add(TranforOr(deStr[2]));
+						deStr[3] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 4) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[3]));
+						deStr[4] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 1) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[4]));
+						deStr[5] = (char) ((byte) ((((readQuaReasult[i*3 + 1] & 0xff) % 2) * 4)
+								+ ((((readQuaReasult[i*3 + 2] + 128) & 0xff) >> 6) % 4)) + 48);
+						dexQual2.add(TranforOr(deStr[5]));
+						deStr[6] = (char) ((byte) (((readQuaReasult[i*3 + 2] & 0xff) >> 3) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[6]));
+						deStr[7] = (char) ((byte) ((readQuaReasult[i*3 + 2] & 0xff) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[7]));
+						break;
+					case 1:
+						deStr[1] = (char) ((byte) (((readQuaReasult[i*3] & 0xff) >> 2) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[1]));
+						deStr[2] = (char) ((byte) ((((readQuaReasult[i*3] & 0xff) % 4) * 2)
+								+ ((((readQuaReasult[i*3 + 1] + 128) & 0xff) >> 7) % 2)) + 48);
+						dexQual2.add(TranforOr(deStr[2]));
+						deStr[3] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 4) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[3]));
+						deStr[4] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 1) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[4]));
+						deStr[5] = (char) ((byte) ((((readQuaReasult[i*3 + 1] & 0xff) % 2) * 4)
+								+ ((((readQuaReasult[i*3 + 2] + 128) & 0xff) >> 6) % 4)) + 48);
+						dexQual2.add(TranforOr(deStr[5]));
+						deStr[6] = (char) ((byte) (((readQuaReasult[i*3 + 2] & 0xff) >> 3) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[6]));
+						deStr[7] = (char) ((byte) ((readQuaReasult[i*3 + 2] & 0xff) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[7]));
+						break;
+					case 2:
+						deStr[2] = (char) ((byte) ((((readQuaReasult[i*3] & 0xff) % 4) * 2)
+								+ ((((readQuaReasult[i*3 + 1] + 128) & 0xff) >> 7) % 2)) + 48);
+						dexQual2.add(TranforOr(deStr[2]));
+						deStr[3] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 4) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[3]));
+						deStr[4] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 1) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[4]));
+						deStr[5] = (char) ((byte) ((((readQuaReasult[i*3 + 1] & 0xff) % 2) * 4)
+								+ ((((readQuaReasult[i*3 + 2] + 128) & 0xff) >> 6) % 4)) + 48);
+						dexQual2.add(TranforOr(deStr[5]));
+						deStr[6] = (char) ((byte) (((readQuaReasult[i*3 + 2] & 0xff) >> 3) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[6]));
+						deStr[7] = (char) ((byte) ((readQuaReasult[i*3 + 2] & 0xff) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[7]));
+						break;
+					case 3:
+						deStr[3] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 4) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[3]));
+						deStr[4] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 1) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[4]));
+						deStr[5] = (char) ((byte) ((((readQuaReasult[i*3 + 1] & 0xff) % 2) * 4)
+								+ ((((readQuaReasult[i*3 + 2] + 128) & 0xff) >> 6) % 4)) + 48);
+						dexQual2.add(TranforOr(deStr[5]));
+						deStr[6] = (char) ((byte) (((readQuaReasult[i*3 + 2] & 0xff) >> 3) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[6]));
+						deStr[7] = (char) ((byte) ((readQuaReasult[i*3 + 2] & 0xff) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[7]));
+						break;
+					case 4:
+						deStr[4] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 1) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[4]));
+						deStr[5] = (char) ((byte) ((((readQuaReasult[i*3 + 1] & 0xff) % 2) * 4)
+								+ ((((readQuaReasult[i*3 + 2] + 128) & 0xff) >> 6) % 4)) + 48);
+						dexQual2.add(TranforOr(deStr[5]));
+						deStr[6] = (char) ((byte) (((readQuaReasult[i*3 + 2] & 0xff) >> 3) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[6]));
+						deStr[7] = (char) ((byte) ((readQuaReasult[i*3 + 2] & 0xff) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[7]));
+						break;
+					case 5:
+						deStr[5] = (char) ((byte) ((((readQuaReasult[i*3 + 1] & 0xff) % 2) * 4)
+								+ ((((readQuaReasult[i*3 + 2] + 128) & 0xff) >> 6) % 4)) + 48);
+						dexQual2.add(TranforOr(deStr[5]));
+						deStr[6] = (char) ((byte) (((readQuaReasult[i*3 + 2] & 0xff) >> 3) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[6]));
+						deStr[7] = (char) ((byte) ((readQuaReasult[i*3 + 2] & 0xff) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[7]));
+						break;
+					case 6:
+						deStr[6] = (char) ((byte) (((readQuaReasult[i*3 + 2] & 0xff) >> 3) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[6]));
+						deStr[7] = (char) ((byte) ((readQuaReasult[i*3 + 2] & 0xff) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[7]));
+						break;
+					case 7:
+						deStr[7] = (char) ((byte) ((readQuaReasult[i*3 + 2] & 0xff) % 8) + 48);
+						dexQual2.add(TranforOr(deStr[7]));
+						break;
+					default:
+						break;
+					}
+				}
+			}
+			else if (i == endNum)
+			{
+				switch (endNumRe)
+				{
+				case 0:
+					// 剩余0个，对于最大范围不会超出，因为qualcount最大表示也是byte的范围
+					break;
+				case 1:
+					deStr[0] = (char) ((byte) ((((readQuaReasult[i*3] + 128) & 0xff) >> 5) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[0]));
+					break;
+				case 2:
+					deStr[0] = (char) ((byte) ((((readQuaReasult[i*3] + 128) & 0xff) >> 5) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[0]));
+					deStr[1] = (char) ((byte) (((readQuaReasult[i*3] & 0xff) >> 2) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[1]));
+					break;
+				case 3:
+					deStr[0] = (char) ((byte) ((((readQuaReasult[i*3] + 128) & 0xff) >> 5) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[0]));
+					deStr[1] = (char) ((byte) (((readQuaReasult[i*3] & 0xff) >> 2) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[1]));
+					deStr[2] = (char) ((byte) ((((readQuaReasult[i*3] & 0xff) % 4) * 2)
+							+ ((((readQuaReasult[i*3 + 1] + 128) & 0xff) >> 7) % 2)) + 48);
+					dexQual2.add(TranforOr(deStr[2]));
+					break;
+				case 4:
+					deStr[0] = (char) ((byte) ((((readQuaReasult[i*3] + 128) & 0xff) >> 5) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[0]));
+					deStr[1] = (char) ((byte) (((readQuaReasult[i*3] & 0xff) >> 2) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[1]));
+					deStr[2] = (char) ((byte) ((((readQuaReasult[i*3] & 0xff) % 4) * 2)
+							+ ((((readQuaReasult[i*3 + 1] + 128) & 0xff) >> 7) % 2)) + 48);
+					dexQual2.add(TranforOr(deStr[2]));
+					deStr[3] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 4) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[3]));
+					break;
+				case 5:
+					deStr[0] = (char) ((byte) ((((readQuaReasult[i*3] + 128) & 0xff) >> 5) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[0]));
+					deStr[1] = (char) ((byte) (((readQuaReasult[i*3] & 0xff) >> 2) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[1]));
+					deStr[2] = (char) ((byte) ((((readQuaReasult[i*3] & 0xff) % 4) * 2)
+							+ ((((readQuaReasult[i*3 + 1] + 128) & 0xff) >> 7) % 2)) + 48);
+					dexQual2.add(TranforOr(deStr[2]));
+					deStr[3] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 4) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[3]));
+					deStr[4] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 1) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[4]));
+					break;
+				case 6:
+					deStr[0] = (char) ((byte) ((((readQuaReasult[i*3] + 128) & 0xff) >> 5) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[0]));
+					deStr[1] = (char) ((byte) (((readQuaReasult[i*3] & 0xff) >> 2) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[1]));
+					deStr[2] = (char) ((byte) ((((readQuaReasult[i*3] & 0xff) % 4) * 2)
+							+ ((((readQuaReasult[i*3 + 1] + 128) & 0xff) >> 7) % 2)) + 48);
+					dexQual2.add(TranforOr(deStr[2]));
+					deStr[3] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 4) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[3]));
+					deStr[4] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 1) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[4]));
+					deStr[5] = (char) ((byte) ((((readQuaReasult[i*3 + 1] & 0xff) % 2) * 4)
+							+ ((((readQuaReasult[i*3 + 2] + 128) & 0xff) >> 6) % 4)) + 48);
+					dexQual2.add(TranforOr(deStr[5]));
+					break;
+				case 7:
+					deStr[0] = (char) ((byte) ((((readQuaReasult[i*3] + 128) & 0xff) >> 5) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[0]));
+					deStr[1] = (char) ((byte) (((readQuaReasult[i*3] & 0xff) >> 2) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[1]));
+					deStr[2] = (char) ((byte) ((((readQuaReasult[i*3] & 0xff) % 4) * 2)
+							+ ((((readQuaReasult[i*3 + 1] + 128) & 0xff) >> 7) % 2)) + 48);
+					dexQual2.add(TranforOr(deStr[2]));
+					deStr[3] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 4) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[3]));
+					deStr[4] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 1) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[4]));
+					deStr[5] = (char) ((byte) ((((readQuaReasult[i*3 + 1] & 0xff) % 2) * 4)
+							+ ((((readQuaReasult[i*3 + 2] + 128) & 0xff) >> 6) % 4)) + 48);
+					dexQual2.add(TranforOr(deStr[5]));
+					deStr[6] = (char) ((byte) (((readQuaReasult[i*3 + 2] & 0xff) >> 3) % 8) + 48);
+					dexQual2.add(TranforOr(deStr[6]));
+					break;
+				default:
+					break;
+				}
+			}
+			else
+			{
+				// 永远不可能是最后，这是中间过程
+				deStr[0] = (char) ((byte) ((((readQuaReasult[i*3] + 128) & 0xff) >> 5) % 8) + 48);
+				dexQual2.add(TranforOr(deStr[0]));
+				deStr[1] = (char) ((byte) (((readQuaReasult[i*3] & 0xff) >> 2) % 8) + 48);
+				dexQual2.add(TranforOr(deStr[1]));
+				deStr[2] = (char) ((byte) ((((readQuaReasult[i*3] & 0xff) % 4) * 2)
+						+ ((((readQuaReasult[i*3 + 1] + 128) & 0xff) >> 7) % 2)) + 48);
+				dexQual2.add(TranforOr(deStr[2]));
+				deStr[3] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 4) % 8) + 48);
+				dexQual2.add(TranforOr(deStr[3]));
+				deStr[4] = (char) ((byte) (((readQuaReasult[i*3 + 1] & 0xff) >> 1) % 8) + 48);
+				dexQual2.add(TranforOr(deStr[4]));
+				deStr[5] = (char) ((byte) ((((readQuaReasult[i*3 + 1] & 0xff) % 2) * 4)
+						+ ((((readQuaReasult[i*3 + 2] + 128) & 0xff) >> 6) % 4)) + 48);
+				dexQual2.add(TranforOr(deStr[5]));
+				deStr[6] = (char) ((byte) (((readQuaReasult[i*3 + 2] & 0xff) >> 3) % 8) + 48);
+				dexQual2.add(TranforOr(deStr[6]));
+				deStr[7] = (char) ((byte) ((readQuaReasult[i*3 + 2] & 0xff) % 8) + 48);
+				dexQual2.add(TranforOr(deStr[7]));
+			}
+		}
+		
+		return dexQual2;
+
+	}
+	
+	/**
+	 * 局部显示解压缩
+	 * @param reResult
+	 * @return
+	 */
+	private static ArrayList<DeRead> partPBWTAlgoRe(ReadPbwtResult reResult)
+	{
+		ArrayList<ArrayList<Integer>> pbwtResult = new ArrayList<>();
+		
+		ArrayList<DeRead> readsCurTemp = new ArrayList<>();
+		ArrayList<DeRead> result = new ArrayList<>();
+
+		int MinStart = reResult.getMinStart();
+		pbwtResult = reResult.getListsPBWT();
+		int curValue = -1;
+		char curReadQual;
+		char curExQual;
+		String curEx = null;
+		
+		int qualIndex = 0;
+		int exQualIndex = 0;
+		int exIndex = 0;
+		
+		ArrayList<Integer> reIndex;	// 构建当前列索引
+		ArrayList<ArrayList<Integer>> Index = new ArrayList<>(); // 所有索引信息
+	
+		int indexpos = -1;
+		int posValue = -1;
+
+		ArrayList<Integer> c;
+		ArrayList<Integer> d;
+		
+		boolean oneFlag = false;
+		boolean zeroFlag = false;
+		
+		int preSize = 0; // 定义之前的碱基值和之前列的大小
+		int currSize = 0, currAddSize = 0; // 定义当前的
+		ArrayList<Integer> removeIndexRe = new ArrayList<Integer>();
+		Boolean removeFlag = false;
+		int pre = 0; // 索引空间大小
+		int cur = 0; // currentlist当前被删除元素之前序列数量
+		LinkedList<Integer> posIndex = new LinkedList<Integer>(); // 位置索引表，表示插入到输出list中位置
+		// 比对完之后从左往右
+		for(int col = 0; col < pbwtResult.size(); col++)
+		{
+			preSize = readsCurTemp.size(); // 前一列大小用currlist大小表示
+			currSize = pbwtResult.get(col).size(); // 用取到pbwt当前列表示
+			currAddSize = currSize > preSize ? (currSize - preSize) : 0; // 新加入序列大小
+			// 构造还原空间
+			for (int i = 0; i < currAddSize; i++)
+			{
+				DeRead listTemp = new DeRead();
+				listTemp.setStart(MinStart+col); // 在创建序列的时候设置起始位置信息
+				readsCurTemp.add(listTemp);
+				if (col != 0)
+				{
+					int length = Index.size() - 1;
+					int length2= Index.get(length).size(); // 会不断更新
+					Index.get(length).add(length2);
+				}
+			}
+			if (!readsCurTemp.isEmpty())
+			{
+				c = new ArrayList<>();
+				d = new ArrayList<>();
+				// 第一列或者是前一列为空列
+				if (col == 0)
+				{
+					reIndex = new ArrayList<>();
+					int preIndex = 0;
+					
+					for (int i = 0; i < readsCurTemp.size(); i++)
+					{
+						curValue = pbwtResult.get(col).get(i);
+						preIndex = i;
+						readsCurTemp.get(i).getRead().add(curValue);
+						if (curValue == 0)
+						{
+							// 加入质量分数,一列都是一个值
+							curReadQual = reResult.getListsQual().get(qualIndex);
+							readsCurTemp.get(i).getReadQual().add(curReadQual);
+							readsCurTemp.get(i).getQual().add(curReadQual);
+							c.add(preIndex);
+							zeroFlag = true;
+						}
+						else if (curValue == 1) {
+							// 添加异常信息，一列都是一个质量分数
+							curExQual = reResult.getListsQual().get(exQualIndex);
+							curEx = reResult.getListsExcep().get(exIndex).get(0);
+							readsCurTemp.get(i).getExQual().add(curExQual);
+							readsCurTemp.get(i).getQual().add(curExQual);
+							readsCurTemp.get(i).getExBase().add(curEx);
+							reResult.getListsExcep().get(exIndex).remove(0);
+							d.add(preIndex);
+							oneFlag = true;
+						}
+						else {
+							// 当前为三，一般不可能
+						}
+						reIndex.add(i);
+					}
+					if (oneFlag)
+					{
+						exQualIndex++;
+						exIndex++;
+						oneFlag = false;
+					}
+					if (zeroFlag)
+					{
+						qualIndex++;
+						zeroFlag = false;
+					}
+					c.addAll(d);
+					Index.add(reIndex);
+					Index.add(c);
+					continue;
+				}
+				// 对于RL纵向序列采用逆TPBWT还原
+				for (int row = 0; row < currSize; row++)
+				{
+					indexpos = Index.get(col).get(row);
+					posValue = pbwtResult.get(col).get(row);
+					if (posValue == 0){
+						c.add(indexpos);
+						readsCurTemp.get(indexpos).getRead().add(posValue);
+						curReadQual = reResult.getListsQual().get(qualIndex);
+						readsCurTemp.get(indexpos).getReadQual().add(curReadQual);
+						readsCurTemp.get(indexpos).getQual().add(curReadQual); // 不要忘记在最后对计数器改变值
+						zeroFlag = true;
+						if (col == pbwtResult.size())
+						{
+							removeIndexRe.add(indexpos);
+							removeFlag = true;
+						}
+						
+					}
+					else if (posValue == 1) {
+						d.add(indexpos);
+						readsCurTemp.get(indexpos).getRead().add(posValue);
+						curExQual = reResult.getListsQual().get(exQualIndex);
+						curEx = reResult.getListsExcep().get(exIndex).get(0);
+						readsCurTemp.get(indexpos).getExQual().add(curExQual);
+						readsCurTemp.get(indexpos).getExBase().add(curEx);
+						reResult.getListsExcep().get(exIndex).remove(0);
+						oneFlag = true;
+						if (col == pbwtResult.size())
+						{
+							removeIndexRe.add(indexpos);
+							removeFlag = true;
+						}
+					}
+					else if (posValue == ReadElemEnum.END.ordinal()) {
+						readsCurTemp.get(indexpos).getRead().add(posValue);
+						removeIndexRe.add(indexpos);
+						removeFlag = true;
+					}
+					else {
+						// 这个位置留给情况2
+						// 索引的处理放在后面，
+					}
+				}
+				// 在这里构建下一列的索引
+				// 并且该自增1的在这里判断
+				if (oneFlag)
+				{
+					exQualIndex++;
+					exIndex++;
+					oneFlag = false;
+				}
+				if (zeroFlag)
+				{
+					qualIndex++;
+					zeroFlag = false;
+				}
+				
+				// 在这里构建下一列的索引
+				// 改一下，放在后面需要进行一步删除操作
+				c.addAll(d);
+				
+				if (removeFlag == true)
+				{
+					// 删除结尾为3的序列并且同时改变索引表
+					int offset = 0;
+					Collections.sort(removeIndexRe);
+					for (Integer ins : removeIndexRe)
+					{
+						pre = posIndex.size();
+						cur = ins - offset;
+						// 删除序列操作
+						if (pre == cur)
+						{
+							// 加在末尾
+							result.add(readsCurTemp.get(ins - offset));
+							readsCurTemp.remove(ins - offset);
+							
+						}
+						else if (pre<cur) {
+							for (int i = 0; i < cur-pre; i++)
+							{
+								DeRead empty = new DeRead();
+								result.add(empty);
+								posIndex.add(result.size() - 1);
+							}
+							result.add(readsCurTemp.get(ins - offset));
+							readsCurTemp.remove(ins - offset);
+						}
+						else {
+							// 此时表明之前没有出去的序列要出去
+							int pos = posIndex.get(cur);
+							posIndex.remove(cur);
+							result.set(pos, readsCurTemp.get(ins - offset));
+							readsCurTemp.remove(ins - offset);
+						}
+						// 改变索引表
+						int tempIndex = -1;
+						for (int i = 0; i < c.size(); i++)
+						{
+							if ((ins - offset)<=c.get(i))
+							{
+								tempIndex = c.get(i)-1;
+								c.set(i, tempIndex);
+							}
+//							else if ((ins - offset) == c.get(i))
+//							{
+//								c.remove(i);
+//								i--;
+//							}
+//							else {
+//								
+//							}
+						}
+						
+						offset++;
+					}
+					removeIndexRe.clear();
+					removeFlag = false;
+				}
+				
+				// 在这里构建下一列的索引
+				// 改一下，放在后面需要进行一步删除操作
+				Index.add(c);
+				
+			}
+			else
+			{
+				// 这里是针对该列为空的情况，单独设计
+				ArrayList<Integer> emptyIndex = new ArrayList<>();
+				Index.add(emptyIndex);
+			}
+			
+		}
+	return result;	
+	}
+	
 	
 }
